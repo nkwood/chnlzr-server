@@ -1,0 +1,12 @@
+*\.properties*
+!example-chnlzr.properties
+
+target/
+.idea/
+
+*.class
+*.jar
+*.iml
+*.so
+
+notes.txt
