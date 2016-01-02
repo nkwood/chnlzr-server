@@ -90,7 +90,7 @@ public class ChnlBrkrGreeter implements Runnable {
                    .await(config.brokerGreetingTimeoutMs(), TimeUnit.MILLISECONDS);
 
       if (greetingHandler.greeted())
-        log.debug("greeted the channel broker");
+        log.info("greeted the channel broker");
       else
         log.warn("channel broker connection closed without receiving BRKR_HELLO");
 

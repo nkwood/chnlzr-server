@@ -19,6 +19,7 @@ package org.anhonesteffort.chnlzr;
 
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
+import org.anhonesteffort.dsp.Sink;
 import org.anhonesteffort.dsp.StreamInterruptedException;
 import org.anhonesteffort.dsp.filter.ComplexNumberFrequencyTranslatingFilter;
 import org.anhonesteffort.dsp.filter.Filter;
@@ -85,13 +86,16 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
     floatIndex  = 0;
   }
 
-  private void writeOrQueue(ComplexNumber sample) {
-    nextSamples.set(floatIndex++, sample.getInPhase());
-    nextSamples.set(floatIndex++, sample.getQuadrature());
+  private class SamplesWritingQueue implements Sink<ComplexNumber> {
+    @Override
+    public void consume(ComplexNumber sample) {
+      nextSamples.set(floatIndex++, sample.getInPhase());
+      nextSamples.set(floatIndex++, sample.getQuadrature());
 
-    if (floatIndex >= nextSamples.size()) {
-      writeQueue.writeOrQueue(nextMessage);
-      initNextMessage();
+      if (floatIndex >= nextSamples.size()) {
+        writeQueue.writeOrQueue(nextMessage);
+        initNextMessage();
+      }
     }
   }
 
@@ -107,22 +111,22 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
       );
 
       freqTranslation.addSink(resampling);
-      resampling.addSink(this::writeOrQueue);
+      resampling.addSink(new SamplesWritingQueue());
 
       long           channelRate  = (long) (sampleRate * resampling.getRateChange());
       MessageBuilder channelState = CapnpUtil.state(channelRate, 0d);
 
       writeQueue.writeOrQueue(channelState);
 
-      log.debug("source rate: " + sampleRate + ", desired rate: " + spec.getSampleRate());
-      log.debug("actual rate: " + channelRate + ", interpolation: " + resampling.getInterpolation() + ", decimation: " + resampling.getDecimation());
+      log.info(spec + " source rate " + sampleRate + ", desired rate " + spec.getSampleRate() + ", channel rate " + channelRate);
+      log.info(spec + " interpolation " + resampling.getInterpolation() + ", decimation " + resampling.getDecimation());
     }
   }
 
   @Override
   public void consume(Samples samples) {
     if (!samplesQueue.offer(samples.getSamples())) {
-      log.warn("sample queue for channel " + spec + " has overflowed, closing connection");
+      log.warn(spec + " sample queue has overflowed, closing connection");
       writeQueue.writeAndClose(CapnpUtil.error(Error.ERROR_TOO_BUSY));
       samplesQueue.clear();
     }
@@ -155,7 +159,7 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
       });
 
     } catch (StreamInterruptedException e) {
-      log.debug("channel " + spec + " interrupted, assuming execution was canceled");
+      log.debug(spec + " interrupted, assuming execution was canceled");
     } finally {
       samplesQueue.clear();
       freqTranslation = null;

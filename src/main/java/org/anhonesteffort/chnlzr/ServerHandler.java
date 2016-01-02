@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
 import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
@@ -86,9 +87,15 @@ public class ServerHandler extends ChannelHandlerAdapter {
     int                  error        = sourceController.configureSourceForSink(channelSink);
 
     if (error == 0x00) {
-      Future channelFuture = executor.submit(channelSink);
-             allocation    = Optional.of(new ChannelAllocationRef(channelQueue, channelSink, channelFuture));
-      log.info("started new channel sink for " + CapnpUtil.spec(request));
+      try {
+
+        Future channelFuture = executor.submit(channelSink);
+               allocation    = Optional.of(new ChannelAllocationRef(channelQueue, channelSink, channelFuture));
+        log.info(CapnpUtil.spec(request) + " channel sink started");
+
+      } catch (RejectedExecutionException e) {
+        context.writeAndFlush(CapnpUtil.error(Error.ERROR_TOO_BUSY));
+      }
     } else {
       context.writeAndFlush(CapnpUtil.error(error));
     }
@@ -117,7 +124,11 @@ public class ServerHandler extends ChannelHandlerAdapter {
 
   @Override
   public void exceptionCaught(ChannelHandlerContext context, Throwable cause) {
-    log.warn("caught unexpected exception, closing", cause);
+    if (allocation.isPresent()) {
+      log.error(allocation.get().getChannelSink().getChannelSpec() + " caught unexpected exception, closing", cause);
+    } else {
+      log.error("caught unexpected exception, closing", cause);
+    }
     context.close();
   }
 
@@ -126,6 +137,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
     if (allocation.isPresent()) {
       sourceController.releaseSink(allocation.get().getChannelSink());
       allocation.get().getChannelFuture().cancel(true);
+      log.info(allocation.get().getChannelSink().getChannelSpec() + " channel sink stopped");
       allocation = Optional.empty();
     }
   }

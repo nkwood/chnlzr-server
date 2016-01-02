@@ -24,10 +24,10 @@ import org.anhonesteffort.dsp.sample.TunableSamplesSourceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.anhonesteffort.chnlzr.Proto.Error;
 
@@ -35,7 +35,8 @@ public class SamplesSourceController {
 
   private static final Logger log = LoggerFactory.getLogger(SamplesSourceController.class);
 
-  private final List<RfChannelSink>  sinks = new LinkedList<>();
+  private final Queue<RfChannelSink> sinks   = new ConcurrentLinkedQueue<>();
+  private final Object               txnLock = new Object();
   private final Double               dcOffsetHz;
   private       TunableSamplesSource source;
 
@@ -129,37 +130,41 @@ public class SamplesSourceController {
                                   source.getMaxSampleRate());
   }
 
-  public synchronized int configureSourceForSink(RfChannelSink sink) {
-    ChannelSpec requestedChannel = sink.getChannelSpec();
-    ChannelSpec tunedChannel     = source.getTunedChannel();
+  public int configureSourceForSink(RfChannelSink sink) {
+    synchronized (txnLock) {
+      ChannelSpec requestedChannel = sink.getChannelSpec();
+      ChannelSpec tunedChannel     = source.getTunedChannel();
 
-    if (!source.isTunable(accommodateDcOffset(requestedChannel)))
-      return Error.ERROR_INCAPABLE;
+      if (!source.isTunable(accommodateDcOffset(requestedChannel)))
+        return Error.ERROR_INCAPABLE;
 
-    if (tunedChannel.containsChannel(requestedChannel)) {
-      source.addSink(sink);
-      sinks.add(sink);
-      return 0x00;
-    } else if (isTunable(requestedChannel)) {
-      try {
-
-        handleTuneToFitNewChannel(requestedChannel);
+      if (tunedChannel.containsChannel(requestedChannel)) {
         source.addSink(sink);
         sinks.add(sink);
         return 0x00;
+      } else if (isTunable(requestedChannel)) {
+        try {
 
-      } catch (SamplesSourceException e) {
-        log.error("failed to configure source for consumer channel " + requestedChannel, e);
-        return Error.ERROR_UNKNOWN;
+          handleTuneToFitNewChannel(requestedChannel);
+          source.addSink(sink);
+          sinks.add(sink);
+          return 0x00;
+
+        } catch (SamplesSourceException e) {
+          log.error("failed to configure source for consumer channel " + requestedChannel, e);
+          return Error.ERROR_UNKNOWN;
+        }
       }
     }
 
     return Error.ERROR_TOO_BUSY;
   }
 
-  public synchronized void releaseSink(RfChannelSink sink) {
-    source.removeSink(sink);
-    sinks.remove(sink);
+  public void releaseSink(RfChannelSink sink) {
+    synchronized (txnLock) {
+      source.removeSink(sink);
+      sinks.remove(sink);
+    }
   }
 
 }
