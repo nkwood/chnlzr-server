@@ -21,6 +21,7 @@ import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
+import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
 import org.anhonesteffort.dsp.sample.TunableSamplesSourceProvider;
 import org.junit.Test;
 
@@ -99,7 +100,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithSingleSink() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new SamplesSourceFactory().get().get();
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, DC_OFFSET);
 
     final RfChannelSink SINK0 = sinkFor(500_000d, 600_000d);
@@ -134,7 +135,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithMultipleSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new SamplesSourceFactory().get().get();
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);

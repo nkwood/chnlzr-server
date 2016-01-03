@@ -36,9 +36,11 @@ import org.anhonesteffort.chnlzr.pipeline.BaseMessageEncoder;
 import org.anhonesteffort.chnlzr.pipeline.IdleStateHeartbeatWriter;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
+import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,12 +76,12 @@ public class ChnlzrServer {
     greetingExecutor = Executors.newSingleThreadScheduledExecutor();
     dspExecutor      = Executors.newFixedThreadPool(config.dspExecutorPoolSize());
 
-    SamplesSourceFactory           sourceFactory = new SamplesSourceFactory();
-    Optional<TunableSamplesSource> source        = sourceFactory.get();
+    TunableSamplesSourceFactory sourceFactory = new TunableSamplesSourceFactory();
+    List<TunableSamplesSource>  sources       = sourceFactory.get();
 
-    if (source.isPresent()) {
-      this.source      = source.get();
-      sourceController = new SamplesSourceController(source.get(), config.dcOffset());
+    if (!sources.isEmpty()) {
+      this.source      = sources.get(0);
+      sourceController = new SamplesSourceController(this.source, config.dcOffset());
     } else {
       throw new SamplesSourceException("no samples sources available");
     }
