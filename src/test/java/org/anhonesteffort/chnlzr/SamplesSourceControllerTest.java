@@ -66,8 +66,8 @@ public class SamplesSourceControllerTest {
     }
 
     @Override
-    protected Runnable newProducer() {
-      return () -> System.out.print("");
+    public Void call() {
+      return null;
     }
   }
 
@@ -99,7 +99,8 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithSingleSink() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(DC_OFFSET);
+    final TunableSamplesSource    SOURCE     = new SamplesSourceFactory().get().get();
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, DC_OFFSET);
 
     final RfChannelSink SINK0 = sinkFor(500_000d, 600_000d);
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
@@ -133,7 +134,8 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithMultipleSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(DC_OFFSET);
+    final TunableSamplesSource    SOURCE     = new SamplesSourceFactory().get().get();
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
     final RfChannelSink           SINK2      = sinkFor(700_000d, 800_000d);

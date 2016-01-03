@@ -17,7 +17,12 @@
 
 package org.anhonesteffort.chnlzr;
 
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -29,8 +34,10 @@ import io.netty.handler.timeout.IdleStateHandler;
 import org.anhonesteffort.chnlzr.pipeline.BaseMessageDecoder;
 import org.anhonesteffort.chnlzr.pipeline.BaseMessageEncoder;
 import org.anhonesteffort.chnlzr.pipeline.IdleStateHeartbeatWriter;
-import org.anhonesteffort.dsp.ConcurrentSource;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
+import org.anhonesteffort.dsp.sample.TunableSamplesSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -40,15 +47,16 @@ import java.util.concurrent.TimeUnit;
 
 public class ChnlzrServer {
 
-  private final ScheduledExecutorService greetingExecutor = Executors.newSingleThreadScheduledExecutor();
+  private final ScheduledExecutorService greetingExecutor;
   private final ExecutorService          dspExecutor;
+  private final TunableSamplesSource     source;
   private final SamplesSourceController  sourceController;
-  private final ChnlzrServerConfig       config;
 
-  private final String            hostname;
-  private final int               listenPort;
-  private final Optional<String>  brokerHostname;
-  private final Optional<Integer> brokerPort;
+  private final ChnlzrServerConfig config;
+  private final String             hostname;
+  private final int                listenPort;
+  private final Optional<String>   brokerHostname;
+  private final Optional<Integer>  brokerPort;
 
   public ChnlzrServer(ChnlzrServerConfig config,
                       String             hostname,
@@ -57,19 +65,31 @@ public class ChnlzrServer {
                       Optional<Integer>  brokerPort)
       throws SamplesSourceException
   {
-    dspExecutor         = Executors.newFixedThreadPool(config.dspExecutorPoolSize());
-    sourceController    = new SamplesSourceController(config.dcOffset());
     this.config         = config;
     this.hostname       = hostname;
     this.listenPort     = listenPort;
     this.brokerHostname = brokerHostname;
     this.brokerPort     = brokerPort;
+
+    greetingExecutor = Executors.newSingleThreadScheduledExecutor();
+    dspExecutor      = Executors.newFixedThreadPool(config.dspExecutorPoolSize());
+
+    SamplesSourceFactory           sourceFactory = new SamplesSourceFactory();
+    Optional<TunableSamplesSource> source        = sourceFactory.get();
+
+    if (source.isPresent()) {
+      this.source      = source.get();
+      sourceController = new SamplesSourceController(source.get(), config.dcOffset());
+    } else {
+      throw new SamplesSourceException("no samples sources available");
+    }
   }
 
   public void run() throws InterruptedException {
-    EventLoopGroup  bossGroup   = new NioEventLoopGroup();
-    EventLoopGroup  workerGroup = new NioEventLoopGroup();
-    ServerBootstrap bootstrap   = new ServerBootstrap();
+    ListenableFuture sourceFuture = MoreExecutors.listeningDecorator(dspExecutor).submit(source);
+    EventLoopGroup   bossGroup    = new NioEventLoopGroup();
+    EventLoopGroup   workerGroup  = new NioEventLoopGroup();
+    ServerBootstrap  bootstrap    = new ServerBootstrap();
 
     try {
 
@@ -98,14 +118,36 @@ public class ChnlzrServer {
         ), 0l, config.brokerGreetingIntervalMs(), TimeUnit.MILLISECONDS);
       }
 
+      Futures.addCallback(sourceFuture, new SourceStoppedCallback(channelFuture.channel()));
       channelFuture.channel().closeFuture().sync();
 
     } finally {
       greetingExecutor.shutdownNow();
       dspExecutor.shutdownNow();
-      ConcurrentSource.shutdownSources();
       workerGroup.shutdownGracefully();
       bossGroup.shutdownGracefully();
+      sourceFuture.cancel(true);
+    }
+  }
+
+  private static class SourceStoppedCallback implements FutureCallback<Void> {
+    private static final Logger log = LoggerFactory.getLogger(SourceStoppedCallback.class);
+    private final Channel boundChannel;
+
+    public SourceStoppedCallback(Channel boundChannel) {
+      this.boundChannel = boundChannel;
+    }
+
+    @Override
+    public void onSuccess(Void nothing) {
+      log.error("samples source stopped unexpectedly");
+      boundChannel.close();
+    }
+
+    @Override
+    public void onFailure(Throwable throwable) {
+      log.error("samples source stopped unexpectedly", throwable);
+      boundChannel.close();
     }
   }
 

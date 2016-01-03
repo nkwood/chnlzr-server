@@ -20,13 +20,11 @@ package org.anhonesteffort.chnlzr;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
-import org.anhonesteffort.dsp.sample.TunableSamplesSourceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.Queue;
-import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.anhonesteffort.chnlzr.Proto.Error;
@@ -37,22 +35,12 @@ public class SamplesSourceController {
 
   private final Queue<RfChannelSink> sinks   = new ConcurrentLinkedQueue<>();
   private final Object               txnLock = new Object();
+  private final TunableSamplesSource source;
   private final Double               dcOffsetHz;
-  private       TunableSamplesSource source;
 
-  public SamplesSourceController(Double dcOffsetHz) throws SamplesSourceException {
+  public SamplesSourceController(TunableSamplesSource source, Double dcOffsetHz) {
+    this.source     = source;
     this.dcOffsetHz = dcOffsetHz;
-
-    ServiceLoader.load(TunableSamplesSourceProvider.class).forEach(provider -> {
-      if (source == null) {
-        Optional<TunableSamplesSource> source = provider.get();
-        if (source.isPresent())
-          this.source = source.get();
-      }
-    });
-
-    if (source == null)
-      throw new SamplesSourceException("no sources available");
   }
 
   private Optional<Double> getMinChannelFrequency() {
