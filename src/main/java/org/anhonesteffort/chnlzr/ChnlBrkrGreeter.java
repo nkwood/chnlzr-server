@@ -19,7 +19,6 @@ package org.anhonesteffort.chnlzr;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -32,13 +31,15 @@ import org.anhonesteffort.chnlzr.pipeline.BaseMessageEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.TimeUnit;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
 
 public class ChnlBrkrGreeter implements Runnable {
 
   private static final Logger log = LoggerFactory.getLogger(ChnlBrkrGreeter.class);
+  private static final Timer timer = new Timer(true);
 
   private final ChnlzrServerConfig config;
   private final EventLoopGroup     workerGroup;
@@ -46,6 +47,8 @@ public class ChnlBrkrGreeter implements Runnable {
   private final int                chnlzrPort;
   private final String             brokerHostname;
   private final int                brokerPort;
+
+  private TimerTask timeoutTask;
 
   public ChnlBrkrGreeter(ChnlzrServerConfig config,
                          EventLoopGroup     workerGroup,
@@ -64,9 +67,7 @@ public class ChnlBrkrGreeter implements Runnable {
 
   @Override
   public void run() {
-    Bootstrap       bootstrap       = new Bootstrap();
-    GreetingHandler greetingHandler = new GreetingHandler();
-
+    Bootstrap bootstrap = new Bootstrap();
     bootstrap.group(workerGroup)
              .channel(NioSocketChannel.class)
              .option(ChannelOption.SO_KEEPALIVE, false)
@@ -76,48 +77,27 @@ public class ChnlBrkrGreeter implements Runnable {
                public void initChannel(SocketChannel ch) {
                  ch.pipeline().addLast("encoder", BaseMessageEncoder.INSTANCE);
                  ch.pipeline().addLast("decoder", new BaseMessageDecoder());
-                 ch.pipeline().addLast("handler", greetingHandler);
+                 ch.pipeline().addLast("handler", new GreetingHandler());
                }
              });
 
     ChannelFuture connectFuture = bootstrap.connect(brokerHostname, brokerPort);
+                  timeoutTask   = new TimerTask() {
+      @Override
+      public void run() {
+        log.warn("timed out while waiting for BRKR_HELLO");
+        connectFuture.channel().close();
+      }
+    };
 
-    try {
-
-      // todo: is this what's causing sporadic connection reset errors?
-      connectFuture.await()
-                   .channel()
-                   .closeFuture()
-                   .await(config.brokerGreetingTimeoutMs(), TimeUnit.MILLISECONDS);
-
-      if (greetingHandler.greeted())
-        log.info("greeted the channel broker");
-      else
-        log.warn("channel broker connection closed without receiving BRKR_HELLO");
-
-    } catch (InterruptedException e) {
-      log.warn("timed out while waiting for BRKR_HELLO");
-    } finally {
-      connectFuture.channel().close();
-    }
+    timer.schedule(timeoutTask, config.brokerGreetingTimeoutMs());
   }
 
   private class GreetingHandler extends ChannelHandlerAdapter {
 
-    private boolean helloSent     = false;
-    private boolean helloReceived = false;
-
     @Override
     public void channelActive(ChannelHandlerContext context) {
-      context.writeAndFlush(CapnpUtil.chnlzrHello(chnlzrHostname, chnlzrPort))
-             .addListener(new ChannelFutureListener() {
-               @Override
-               public void operationComplete(ChannelFuture future) {
-                 helloSent = future.isSuccess();
-                 if (!future.isSuccess())
-                   context.close();
-               }
-             });
+      context.writeAndFlush(CapnpUtil.chnlzrHello(chnlzrHostname, chnlzrPort));
     }
 
     @Override
@@ -126,7 +106,8 @@ public class ChnlBrkrGreeter implements Runnable {
 
       switch (message.getType()) {
         case BRKR_HELLO:
-          helloReceived = true;
+          timeoutTask.cancel();
+          log.info("greeted the channel broker");
           context.close();
           break;
 
@@ -136,10 +117,6 @@ public class ChnlBrkrGreeter implements Runnable {
         default:
           log.warn("received unexpected message type from channel broker: " + message.getType());
       }
-    }
-
-    public boolean greeted() {
-      return helloSent && helloReceived;
     }
 
   }
