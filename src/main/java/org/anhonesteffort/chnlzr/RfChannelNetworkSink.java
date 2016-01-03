@@ -127,7 +127,7 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
   public void consume(Samples samples) {
     if (!samplesQueue.offer(samples.getSamples())) {
       log.warn(spec + " sample queue has overflowed, closing connection");
-      writeQueue.writeAndClose(CapnpUtil.error(Error.ERROR_TOO_BUSY));
+      writeQueue.writeAndClose(CapnpUtil.error(Error.ERROR_PROCESSING_UNAVAILABLE));
       samplesQueue.clear();
     }
   }

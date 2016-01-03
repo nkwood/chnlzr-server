@@ -145,7 +145,7 @@ public class SamplesSourceController {
       }
     }
 
-    return Error.ERROR_TOO_BUSY;
+    return Error.ERROR_BANDWIDTH_UNAVAILABLE;
   }
 
   public void releaseSink(RfChannelSink sink) {

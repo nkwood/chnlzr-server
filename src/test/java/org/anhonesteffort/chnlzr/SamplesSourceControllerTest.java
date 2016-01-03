@@ -147,8 +147,8 @@ public class SamplesSourceControllerTest {
     assert CONTROLLER.configureSourceForSink(SINK2) == 0x00;
     assert CONTROLLER.configureSourceForSink(SINK3) == 0x00;
 
-    assert CONTROLLER.configureSourceForSink(sinkFor(800_000d, 900_001d)) == Error.ERROR_TOO_BUSY;
-    assert CONTROLLER.configureSourceForSink(sinkFor(499_999d, 600_000d)) == Error.ERROR_TOO_BUSY;
+    assert CONTROLLER.configureSourceForSink(sinkFor(800_000d, 900_001d)) == Error.ERROR_BANDWIDTH_UNAVAILABLE;
+    assert CONTROLLER.configureSourceForSink(sinkFor(499_999d, 600_000d)) == Error.ERROR_BANDWIDTH_UNAVAILABLE;
 
     CONTROLLER.releaseSink(SINK0);
     assert CONTROLLER.configureSourceForSink(sinkFor(900_000d, 950_000d)) == 0x00;

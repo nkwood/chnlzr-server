@@ -96,7 +96,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
       } catch (RejectedExecutionException e) {
         allocation = Optional.empty();
         sourceController.releaseSink(channelSink);
-        context.writeAndFlush(CapnpUtil.error(Error.ERROR_TOO_BUSY));
+        context.writeAndFlush(CapnpUtil.error(Error.ERROR_PROCESSING_UNAVAILABLE));
       }
     } else {
       context.writeAndFlush(CapnpUtil.error(error));

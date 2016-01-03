@@ -84,6 +84,7 @@ public class ChnlBrkrGreeter implements Runnable {
 
     try {
 
+      // todo: is this what's causing sporadic connection reset errors?
       connectFuture.await()
                    .channel()
                    .closeFuture()
