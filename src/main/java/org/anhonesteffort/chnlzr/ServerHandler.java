@@ -94,6 +94,8 @@ public class ServerHandler extends ChannelHandlerAdapter {
         log.info(CapnpUtil.spec(request) + " channel sink started");
 
       } catch (RejectedExecutionException e) {
+        allocation = Optional.empty();
+        sourceController.releaseSink(channelSink);
         context.writeAndFlush(CapnpUtil.error(Error.ERROR_TOO_BUSY));
       }
     } else {
