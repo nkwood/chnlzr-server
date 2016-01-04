@@ -99,8 +99,8 @@ public class ChnlzrServer {
                .channel(NioServerSocketChannel.class)
                .option(ChannelOption.SO_BACKLOG, 128)
                .childOption(ChannelOption.SO_KEEPALIVE, true)
-               .childOption(ChannelOption.WRITE_BUFFER_HIGH_WATER_MARK, config.avgByteRate())
-               .childOption(ChannelOption.WRITE_BUFFER_LOW_WATER_MARK,  config.avgByteRate() / 4)
+               .childOption(ChannelOption.WRITE_BUFFER_HIGH_WATER_MARK, config.bufferHighWaterMark())
+               .childOption(ChannelOption.WRITE_BUFFER_LOW_WATER_MARK, config.bufferLowWaterMark())
                .childHandler(new ChannelInitializer<SocketChannel>() {
                  @Override
                  public void initChannel(SocketChannel ch) {

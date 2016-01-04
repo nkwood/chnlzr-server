@@ -38,8 +38,6 @@ public class RfChannelNetworkSinkTest {
   private ChnlzrServerConfig config() {
     final ChnlzrServerConfig CONFIG = Mockito.mock(ChnlzrServerConfig.class);
 
-    Mockito.when(CONFIG.avgChannelRate()).thenReturn(48000);
-    Mockito.when(CONFIG.avgByteRate()).thenReturn(ChnlzrConfig.BYTES_PER_SAMPLE * 48000);
     Mockito.when(CONFIG.samplesPerMessage()).thenReturn(10000);
     Mockito.when(CONFIG.clientWriteQueueSize()).thenReturn(16);
     Mockito.when(CONFIG.samplesQueueSize()).thenReturn(16);
