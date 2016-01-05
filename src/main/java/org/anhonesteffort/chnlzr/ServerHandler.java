@@ -19,6 +19,7 @@ package org.anhonesteffort.chnlzr;
 
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import org.capnproto.MessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +36,12 @@ public class ServerHandler extends ChannelHandlerAdapter {
 
   private static final Logger log = LoggerFactory.getLogger(ServerHandler.class);
 
-  private final ChnlzrServerConfig             config;
-  private final ExecutorService                executor;
-  private final SamplesSourceController        sourceController;
-  private       Optional<ChannelAllocationRef> allocation = Optional.empty();
+  private final ChnlzrServerConfig      config;
+  private final ExecutorService         executor;
+  private final SamplesSourceController sourceController;
+  private final MessageBuilder          capabilities;
+
+  private Optional<ChannelAllocationRef> allocation = Optional.empty();
 
   public ServerHandler(ChnlzrServerConfig      config,
                        ExecutorService         executor,
@@ -47,14 +50,15 @@ public class ServerHandler extends ChannelHandlerAdapter {
     this.config           = config;
     this.executor         = executor;
     this.sourceController = sourceController;
+    capabilities          = CapnpUtil.capabilities(
+        config.latitude(),     config.longitude(),
+        config.polarization(), sourceController.getCapabilities()
+    );
   }
 
   @Override
   public void channelActive(ChannelHandlerContext context) {
-    context.writeAndFlush(CapnpUtil.capabilities(
-        config.latitude(),     config.longitude(),
-        config.polarization(), sourceController.getCapabilities()
-    ));
+    context.writeAndFlush(capabilities);
   }
 
   private void handleChannelRequest(ChannelHandlerContext context, ChannelRequest.Reader request) {
