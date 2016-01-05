@@ -75,17 +75,20 @@ public class RfChannelNetworkSinkTest {
     final WriteQueuingContext  QUEUE = new WriteQueuingContext(CONTEXT, 16);
     final RfChannelNetworkSink SINK  = new RfChannelNetworkSink(CONFIG, QUEUE, REQUEST);
 
+    EXECUTOR.submit(SINK);
     SINK.onSourceStateChange(SOURCE_RATE, 9001d);
+    SINK.consume(SAMPLES);
+    Thread.sleep(100l);
+
     Mockito.verify(CONTEXT, Mockito.times(1)).writeAndFlush(Mockito.any());
 
     final int SAMPLES_TO_FEED    = 10;
     final int DECIMATION         = (int) (SOURCE_RATE / CHANNEL_RATE);
     final int SAMPLES_TO_CONSUME = SAMPLES_TO_FEED / DECIMATION;
 
-    EXECUTOR.submit(SINK);
-    IntStream.range(0, SAMPLES_TO_FEED).forEach(i -> {
+    IntStream.range(0, SAMPLES_TO_FEED - 1).forEach(i -> {
       SINK.consume(SAMPLES);
-      try { Thread.sleep(25l); } catch (InterruptedException e) { assert false; }
+      try { Thread.sleep(100l); } catch (InterruptedException e) { assert false; }
     });
 
     Mockito.verify(CONTEXT, Mockito.times(SAMPLES_TO_CONSUME + 1)).writeAndFlush(Mockito.any());

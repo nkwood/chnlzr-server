@@ -19,7 +19,6 @@ package org.anhonesteffort.chnlzr;
 
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
-import org.anhonesteffort.dsp.Sink;
 import org.anhonesteffort.dsp.StreamInterruptedException;
 import org.anhonesteffort.dsp.filter.ComplexNumberFrequencyTranslatingFilter;
 import org.anhonesteffort.dsp.filter.Filter;
@@ -35,6 +34,7 @@ import java.nio.FloatBuffer;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -49,18 +49,16 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
   private static final Logger log = LoggerFactory.getLogger(RfChannelNetworkSink.class);
 
   private final BlockingQueue<FloatBuffer> samplesQueue;
-  private final Object                     processChainLock = new Object();
+  private final WriteQueuingContext        writeQueue;
+  private final ChannelSpec                spec;
+  private final long                       maxRateDiff;
+  private final int                        samplesPerMessage;
 
-  private final WriteQueuingContext writeQueue;
-  private final ChannelSpec         spec;
-  private final long                maxRateDiff;
-  private final int                 samplesPerMessage;
-
-  private Filter<ComplexNumber>       freqTranslation;
-  private MessageBuilder              nextMessage;
-  private PrimitiveList.Float.Builder nextSamples;
-
-  private int floatIndex = -1;
+  private AtomicReference<StateChange> stateChange;
+  private Filter<ComplexNumber>        freqTranslation;
+  private MessageBuilder               nextMessage;
+  private PrimitiveList.Float.Builder  nextSamples;
+  private int                          floatIndex;
 
   public RfChannelNetworkSink(ChnlzrServerConfig    config,
                               WriteQueuingContext   writeQueue,
@@ -72,12 +70,10 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
     maxRateDiff       = request.getMaxRateDiff();
     samplesPerMessage = config.samplesPerMessage();
 
-    initNextMessage();
-  }
+    stateChange = new AtomicReference<>();
+    floatIndex  = -1;
 
-  @Override
-  public ChannelSpec getChannelSpec() {
-    return spec;
+    initNextMessage();
   }
 
   private void initNextMessage() {
@@ -86,41 +82,42 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
     floatIndex  = 0;
   }
 
-  private class SamplesWritingQueue implements Sink<ComplexNumber> {
-    @Override
-    public void consume(ComplexNumber sample) {
-      nextSamples.set(floatIndex++, sample.getInPhase());
-      nextSamples.set(floatIndex++, sample.getQuadrature());
+  private void writeOrQueue(ComplexNumber sample) {
+    nextSamples.set(floatIndex++, sample.getInPhase());
+    nextSamples.set(floatIndex++, sample.getQuadrature());
 
-      if (floatIndex >= nextSamples.size()) {
-        writeQueue.writeOrQueue(nextMessage);
-        initNextMessage();
-      }
+    if (floatIndex >= nextSamples.size()) {
+      writeQueue.writeOrQueue(nextMessage);
+      initNextMessage();
     }
+  }
+
+  private void onSourceStateChange(StateChange stateChange) {
+    freqTranslation = new ComplexNumberFrequencyTranslatingFilter(
+        stateChange.sampleRate, stateChange.frequency, spec.getCenterFrequency()
+    );
+    RateChangeFilter<ComplexNumber> resampling  = FilterFactory.getCicResampler(
+        stateChange.sampleRate, spec.getSampleRate(), maxRateDiff
+    );
+
+    freqTranslation.addSink(resampling);
+    resampling.addSink(this::writeOrQueue);
+
+    long channelRate = (long) (stateChange.sampleRate * resampling.getRateChange());
+    writeQueue.writeOrQueue(CapnpUtil.state(channelRate, 0d));
+
+    log.info(spec + " source rate " + stateChange.sampleRate + ", desired rate " + spec.getSampleRate() + ", channel rate " + channelRate);
+    log.info(spec + " interpolation " + resampling.getInterpolation() + ", decimation " + resampling.getDecimation());
+  }
+
+  @Override
+  public ChannelSpec getChannelSpec() {
+    return spec;
   }
 
   @Override
   public void onSourceStateChange(Long sampleRate, Double frequency) {
-    synchronized (processChainLock) {
-      freqTranslation = new ComplexNumberFrequencyTranslatingFilter(
-          sampleRate, frequency, spec.getCenterFrequency()
-      );
-
-      RateChangeFilter<ComplexNumber> resampling = FilterFactory.getCicResampler(
-          sampleRate, spec.getSampleRate(), maxRateDiff
-      );
-
-      freqTranslation.addSink(resampling);
-      resampling.addSink(new SamplesWritingQueue());
-
-      long           channelRate  = (long) (sampleRate * resampling.getRateChange());
-      MessageBuilder channelState = CapnpUtil.state(channelRate, 0d);
-
-      writeQueue.writeOrQueue(channelState);
-
-      log.info(spec + " source rate " + sampleRate + ", desired rate " + spec.getSampleRate() + ", channel rate " + channelRate);
-      log.info(spec + " interpolation " + resampling.getInterpolation() + ", decimation " + resampling.getDecimation());
-    }
+    stateChange.set(new StateChange(sampleRate, frequency));
   }
 
   @Override
@@ -152,20 +149,34 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
     try {
 
       Stream.generate(this).forEach(samples -> {
-        if (Thread.currentThread().isInterrupted())
-          throw new StreamInterruptedException("interrupted while reading from ComplexNumber stream");
+        StateChange change = stateChange.getAndSet(null);
 
-        synchronized (processChainLock) { samples.forEach(freqTranslation::consume); }
+        if (change != null) {
+          onSourceStateChange(change);
+        }
+
+        samples.forEach(freqTranslation::consume);
       });
 
     } catch (StreamInterruptedException e) {
       log.debug(spec + " interrupted, assuming execution was canceled");
     } finally {
       samplesQueue.clear();
+      stateChange     = null;
       freqTranslation = null;
       nextMessage     = null;
       nextSamples     = null;
       floatIndex      = -1;
+    }
+  }
+
+  private static class StateChange {
+    private final Long   sampleRate;
+    private final Double frequency;
+
+    public StateChange(Long sampleRate, Double frequency) {
+      this.sampleRate = sampleRate;
+      this.frequency  = frequency;
     }
   }
 
