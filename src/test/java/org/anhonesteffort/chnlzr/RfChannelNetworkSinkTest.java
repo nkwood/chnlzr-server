@@ -82,7 +82,7 @@ public class RfChannelNetworkSinkTest {
 
     Mockito.verify(CONTEXT, Mockito.times(1)).writeAndFlush(Mockito.any());
 
-    final int SAMPLES_TO_FEED    = 10;
+    final int SAMPLES_TO_FEED    = 16;
     final int DECIMATION         = (int) (SOURCE_RATE / CHANNEL_RATE);
     final int SAMPLES_TO_CONSUME = SAMPLES_TO_FEED / DECIMATION;
 

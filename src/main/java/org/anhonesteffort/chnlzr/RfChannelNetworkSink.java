@@ -26,10 +26,10 @@ import org.anhonesteffort.dsp.filter.FilterFactory;
 import org.anhonesteffort.dsp.filter.rate.RateChangeFilter;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.capnproto.MessageBuilder;
-import org.capnproto.PrimitiveList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -57,8 +57,7 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
   private AtomicReference<StateChange> stateChange;
   private Filter<ComplexNumber>        freqTranslation;
   private MessageBuilder               nextMessage;
-  private PrimitiveList.Float.Builder  nextSamples;
-  private int                          floatIndex;
+  private ByteBuffer                   nextSamples;
 
   public RfChannelNetworkSink(ChnlzrServerConfig    config,
                               WriteQueuingContext   writeQueue,
@@ -69,24 +68,21 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
     spec              = CapnpUtil.spec(request);
     maxRateDiff       = request.getMaxRateDiff();
     samplesPerMessage = config.samplesPerMessage();
-
-    stateChange = new AtomicReference<>();
-    floatIndex  = -1;
+    stateChange       = new AtomicReference<>();
 
     initNextMessage();
   }
 
   private void initNextMessage() {
     nextMessage = CapnpUtil.samples(samplesPerMessage);
-    nextSamples = nextMessage.getRoot(BaseMessage.factory).getSamples().getSamples();
-    floatIndex  = 0;
+    nextSamples = nextMessage.getRoot(BaseMessage.factory).getSamples().getSamples().asByteBuffer();
   }
 
   private void writeOrQueue(ComplexNumber sample) {
-    nextSamples.set(floatIndex++, sample.getInPhase());
-    nextSamples.set(floatIndex++, sample.getQuadrature());
+    nextSamples.putFloat(sample.getInPhase());
+    nextSamples.putFloat(sample.getQuadrature());
 
-    if (floatIndex >= nextSamples.size()) {
+    if (nextSamples.remaining() <= 0) {
       writeQueue.writeOrQueue(nextMessage);
       initNextMessage();
     }
@@ -166,7 +162,6 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
       freqTranslation = null;
       nextMessage     = null;
       nextSamples     = null;
-      floatIndex      = -1;
     }
   }
 
