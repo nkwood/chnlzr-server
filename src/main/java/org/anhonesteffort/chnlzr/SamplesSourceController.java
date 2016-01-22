@@ -36,10 +36,12 @@ public class SamplesSourceController {
   private final Queue<RfChannelSink> sinks   = new ConcurrentLinkedQueue<>();
   private final Object               txnLock = new Object();
   private final TunableSamplesSource source;
+  private final Integer              maxSinks;
   private final Double               dcOffsetHz;
 
-  public SamplesSourceController(TunableSamplesSource source, Double dcOffsetHz) {
+  public SamplesSourceController(TunableSamplesSource source, Integer maxSinks, Double dcOffsetHz) {
     this.source     = source;
+    this.maxSinks   = maxSinks;
     this.dcOffsetHz = dcOffsetHz;
   }
 
@@ -120,6 +122,11 @@ public class SamplesSourceController {
 
   public int configureSourceForSink(RfChannelSink sink) {
     synchronized (txnLock) {
+
+      if (sinks.size() >= maxSinks) {
+        return Error.ERROR_PROCESSING_UNAVAILABLE;
+      }
+
       ChannelSpec requestedChannel = sink.getChannelSpec();
       ChannelSpec tunedChannel     = source.getTunedChannel();
 

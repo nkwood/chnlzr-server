@@ -101,7 +101,7 @@ public class SamplesSourceControllerTest {
   public void testWithSingleSink() throws Exception {
     final Double                  DC_OFFSET  = 0d;
     final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, DC_OFFSET);
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 1, DC_OFFSET);
 
     final RfChannelSink SINK0 = sinkFor(500_000d, 600_000d);
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
@@ -136,7 +136,7 @@ public class SamplesSourceControllerTest {
   public void testWithMultipleSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
     final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, DC_OFFSET);
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 5, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
     final RfChannelSink           SINK2      = sinkFor(700_000d, 800_000d);
@@ -153,6 +153,22 @@ public class SamplesSourceControllerTest {
     CONTROLLER.releaseSink(SINK0);
     assert CONTROLLER.configureSourceForSink(sinkFor(900_000d, 950_000d)) == 0x00;
     assert CONTROLLER.configureSourceForSink(sinkFor(550_000d, 600_000d)) == 0x00;
+  }
+
+  @Test
+  public void testMaxSinks() throws Exception {
+    final Double                  DC_OFFSET  = 0d;
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 3, DC_OFFSET);
+    final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
+    final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
+    final RfChannelSink           SINK2      = sinkFor(700_000d, 800_000d);
+    final RfChannelSink           SINK3      = sinkFor(800_000d, 900_000d);
+
+    assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
+    assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;
+    assert CONTROLLER.configureSourceForSink(SINK2) == 0x00;
+    assert CONTROLLER.configureSourceForSink(SINK3) == Error.ERROR_PROCESSING_UNAVAILABLE;
   }
 
 }

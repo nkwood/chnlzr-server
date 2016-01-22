@@ -81,7 +81,7 @@ public class ChnlzrServer {
 
     if (!sources.isEmpty()) {
       this.source      = sources.get(0);
-      sourceController = new SamplesSourceController(this.source, config.dcOffset());
+      sourceController = new SamplesSourceController(this.source, (config.dspExecutorPoolSize() - 1), config.dcOffset());
     } else {
       throw new SamplesSourceException("no samples sources available");
     }
