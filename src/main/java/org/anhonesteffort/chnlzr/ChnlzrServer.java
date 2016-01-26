@@ -130,6 +130,8 @@ public class ChnlzrServer {
       bossGroup.shutdownGracefully();
       sourceFuture.cancel(true);
     }
+
+    System.exit(1);
   }
 
   private static class SourceStoppedCallback implements FutureCallback<Void> {
