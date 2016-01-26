@@ -20,9 +20,14 @@ Copy `example-chnlzr.properties` to `chnlzr.properties` and modify as you see fi
 $ mvn package
 ```
 
-## Run
+## Run standalone
 ```
-$ ./run-server.sh localhost 8080 localhost 9090
+$ ./run-server.sh
+```
+
+## Run with chnlbrkr
+```
+$ ./run-server.sh localhost 9090
 ```
 
 ## License

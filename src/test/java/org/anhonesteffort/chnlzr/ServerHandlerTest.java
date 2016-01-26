@@ -20,6 +20,7 @@ package org.anhonesteffort.chnlzr;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
+import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.capnproto.MessageBuilder;
 import org.junit.Test;

@@ -24,7 +24,7 @@
 
     <groupId>org.anhonesteffort.chnlzr</groupId>
     <artifactId>chnlzr-server</artifactId>
-    <version>0.1.2</version>
+    <version>0.2.0</version>
 
     <properties>
         <dsp-mock-source-version>0.1.2</dsp-mock-source-version>
@@ -45,7 +45,7 @@
         <dependency>
             <groupId>org.anhonesteffort.chnlzr</groupId>
             <artifactId>chnlzr-common</artifactId>
-            <version>0.1.6</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

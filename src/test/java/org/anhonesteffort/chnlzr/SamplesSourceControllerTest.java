@@ -17,6 +17,8 @@
 
 package org.anhonesteffort.chnlzr;
 
+import org.anhonesteffort.chnlzr.samples.RfChannelSink;
+import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;

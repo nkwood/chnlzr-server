@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr;
+package org.anhonesteffort.chnlzr.samples;
 
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;

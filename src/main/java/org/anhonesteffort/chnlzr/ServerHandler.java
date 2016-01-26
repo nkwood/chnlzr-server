@@ -19,6 +19,9 @@ package org.anhonesteffort.chnlzr;
 
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import org.anhonesteffort.chnlzr.nat.NatPuncher;
+import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
+import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.capnproto.MessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +44,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
   private final SamplesSourceController sourceController;
   private final MessageBuilder          capabilities;
 
+  private Optional<NatPuncher>           natPuncher = Optional.empty();
   private Optional<ChannelAllocationRef> allocation = Optional.empty();
 
   public ServerHandler(ChnlzrServerConfig      config,
@@ -56,9 +60,20 @@ public class ServerHandler extends ChannelHandlerAdapter {
     );
   }
 
+  public void setNatPuncher(NatPuncher natPuncher) {
+    this.natPuncher = Optional.of(natPuncher);
+  }
+
   @Override
   public void channelActive(ChannelHandlerContext context) {
     context.writeAndFlush(capabilities);
+  }
+
+  @Override
+  public void handlerAdded(ChannelHandlerContext context) {
+    if (natPuncher.isPresent()) {
+      context.writeAndFlush(capabilities);
+    }
   }
 
   private void handleChannelRequest(ChannelHandlerContext context, ChannelRequest.Reader request) {
@@ -114,6 +129,18 @@ public class ServerHandler extends ChannelHandlerAdapter {
     switch (message.getType()) {
       case CHANNEL_REQUEST:
         handleChannelRequest(context, message.getChannelRequest());
+        break;
+
+      case PUNCH:
+        if (natPuncher.isPresent()) {
+          natPuncher.get().punch();
+        } else {
+          log.error("received PUNCH message but have no nat puncher reference");
+          context.close();
+        }
+        break;
+
+      case BRKR_STATE:
         break;
 
       default:

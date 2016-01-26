@@ -21,6 +21,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.capnproto.MessageBuilder;
 import org.junit.Test;
