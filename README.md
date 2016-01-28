@@ -1,9 +1,9 @@
-# chnlzr-server
+# chnlzr
 
-Resample RF spectrum and stream it across the internet.
+Resample RF spectrum and stream it over network.
 
 ## Chose a sample source
-chnlzr-server uses the Java SPI pattern to allow for modular software defined
+chnlzr uses the Java SPI pattern to allow for modular software defined
 radio support. To add support for your SDR extend `org.anhonesteffort.dsp.sample.TunableSamplesSource`
 and implement `org.anhonesteffort.dsp.sample.TunableSamplesSourceProvider`
 then compile to a .jar and copy it to `import/`.
@@ -20,18 +20,13 @@ Copy `example-chnlzr.properties` to `chnlzr.properties` and modify as you see fi
 $ mvn package
 ```
 
-## Run standalone
+## Run
 ```
 $ ./run-server.sh
 ```
 
-## Run with chnlbrkr
-```
-$ ./run-server.sh localhost 9090
-```
-
 ## License
 
-Copyright 2015 An Honest Effort LLC
+Copyright 2016 An Honest Effort LLC
 
 Licensed under the GPLv3: http://www.gnu.org/licenses/gpl-3.0.html

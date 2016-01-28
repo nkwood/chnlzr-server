@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (C) 2015 An Honest Effort LLC, coping.
+  ~ Copyright (C) 2016 An Honest Effort LLC.
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
@@ -23,12 +23,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.anhonesteffort.chnlzr</groupId>
-    <artifactId>chnlzr-server</artifactId>
-    <version>0.2.0</version>
-
-    <properties>
-        <dsp-mock-source-version>0.1.2</dsp-mock-source-version>
-    </properties>
+    <artifactId>chnlzr</artifactId>
+    <version>0.3.0</version>
 
     <repositories>
         <repository>
@@ -45,7 +41,7 @@
         <dependency>
             <groupId>org.anhonesteffort.chnlzr</groupId>
             <artifactId>chnlzr-common</artifactId>
-            <version>0.2.0</version>
+            <version>0.3.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -98,25 +94,6 @@
                                 </transformer>
                             </transformers>
                         </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.4</version>
-                <configuration>
-                    <descriptors>
-                        <descriptor>assembly.xml</descriptor>
-                    </descriptors>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
                     </execution>
                 </executions>
             </plugin>

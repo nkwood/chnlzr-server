@@ -22,12 +22,9 @@ import java.io.IOException;
 public class ChnlzrServerConfig extends ChnlzrConfig {
 
   private final int    serverPort;
-  private final String chnlzrId;
   private final int    samplesPerMessage;
   private final int    samplesQueueSize;
   private final int    dspExecutorPoolSize;
-  private final long   brokerGreetingIntervalMs;
-  private final long   brokerGreetingTimeoutMs;
   private final double latitude;
   private final double longitude;
   private final int    polarization;
@@ -36,25 +33,18 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
   public ChnlzrServerConfig() throws IOException {
     super();
 
-    serverPort               = Integer.parseInt(properties.getProperty("server_port"));
-    chnlzrId                 = properties.getProperty("chnlzr_id");
-    samplesPerMessage        = Integer.parseInt(properties.getProperty("samples_per_message"));
-    samplesQueueSize         = Integer.parseInt(properties.getProperty("samples_queue_size"));
-    dspExecutorPoolSize      = Integer.parseInt(properties.getProperty("dsp_executor_pool_size"));
-    brokerGreetingIntervalMs = Long.parseLong(properties.getProperty("broker_greeting_interval_ms"));
-    brokerGreetingTimeoutMs  = Long.parseLong(properties.getProperty("broker_greeting_timeout_ms"));
-    latitude                 = Double.parseDouble(properties.getProperty("latitude"));
-    longitude                = Double.parseDouble(properties.getProperty("longitude"));
-    polarization             = Integer.parseInt(properties.getProperty("polarization"));
-    dcOffset                 = Double.parseDouble(properties.getProperty("dc_offset"));
+    serverPort          = Integer.parseInt(properties.getProperty("server_port"));
+    samplesPerMessage   = Integer.parseInt(properties.getProperty("samples_per_message"));
+    samplesQueueSize    = Integer.parseInt(properties.getProperty("samples_queue_size"));
+    dspExecutorPoolSize = Integer.parseInt(properties.getProperty("dsp_executor_pool_size"));
+    latitude            = Double.parseDouble(properties.getProperty("latitude"));
+    longitude           = Double.parseDouble(properties.getProperty("longitude"));
+    polarization        = Integer.parseInt(properties.getProperty("polarization"));
+    dcOffset            = Double.parseDouble(properties.getProperty("dc_offset"));
   }
 
   public int serverPort() {
     return serverPort;
-  }
-
-  public String chnlzrId() {
-    return chnlzrId;
   }
 
   public int samplesPerMessage() {
@@ -67,14 +57,6 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
 
   public int dspExecutorPoolSize() {
     return dspExecutorPoolSize;
-  }
-
-  public long brokerGreetingIntervalMs() {
-    return brokerGreetingIntervalMs;
-  }
-
-  public long brokerGreetingTimeoutMs() {
-    return brokerGreetingTimeoutMs;
   }
 
   public double latitude() {

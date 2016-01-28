@@ -30,10 +30,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.timeout.IdleStateHandler;
-import org.anhonesteffort.chnlzr.nat.ChnlBrkrConnectionFactory;
-import org.anhonesteffort.chnlzr.nat.NatPuncher;
 import org.anhonesteffort.chnlzr.pipeline.BaseMessageDecoder;
 import org.anhonesteffort.chnlzr.pipeline.BaseMessageEncoder;
 import org.anhonesteffort.chnlzr.pipeline.IdleStateHeartbeatWriter;
@@ -45,38 +42,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
-import static org.anhonesteffort.chnlzr.Proto.HostId;
 
 public class ChnlzrServer {
 
-  private final ChnlzrServerConfig       config;
-  private final Optional<HostId.Reader>  brkrHost;
-  private final ScheduledExecutorService greetingExecutor;
-  private final ExecutorService          dspExecutor;
-  private final TunableSamplesSource     source;
-  private final ServerHandlerFactory     handlers;
+  private final ChnlzrServerConfig   config;
+  private final ExecutorService      dspExecutor;
+  private final TunableSamplesSource source;
+  private final ServerHandlerFactory handlers;
 
-  public ChnlzrServer(ChnlzrServerConfig config,
-                      Optional<String>   brokerHostname,
-                      Optional<Integer>  brokerPort)
-      throws SamplesSourceException
-  {
+  public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
     this.config = config;
-
-    if (brokerHostname.isPresent() && brokerPort.isPresent()) {
-      brkrHost = Optional.of(CapnpUtil.hostId(brokerHostname.get(), brokerPort.get()));
-    } else {
-      brkrHost = Optional.empty();
-    }
-
-    greetingExecutor = Executors.newSingleThreadScheduledExecutor();
-    dspExecutor      = Executors.newFixedThreadPool(config.dspExecutorPoolSize());
+    dspExecutor = Executors.newFixedThreadPool(config.dspExecutorPoolSize());
 
     TunableSamplesSourceFactory sourceFactory = new TunableSamplesSourceFactory();
     List<TunableSamplesSource>  sources       = sourceFactory.get();
@@ -119,21 +98,10 @@ public class ChnlzrServer {
                });
 
       ChannelFuture channelFuture = bootstrap.bind(config.serverPort()).sync();
-
-      if (brkrHost.isPresent()) {
-        ChnlBrkrConnectionFactory connections = new ChnlBrkrConnectionFactory(config, NioSocketChannel.class, workerGroup);
-        NatPuncher                natPuncher  = new NatPuncher(connections, handlers, brkrHost.get());
-
-        greetingExecutor.scheduleAtFixedRate(
-            natPuncher::punch, 0l, config.brokerGreetingIntervalMs(), TimeUnit.MILLISECONDS
-        );
-      }
-
       Futures.addCallback(sourceFuture, new SourceStoppedCallback(channelFuture.channel()));
       channelFuture.channel().closeFuture().sync();
 
     } finally {
-      greetingExecutor.shutdownNow();
       dspExecutor.shutdownNow();
       workerGroup.shutdownGracefully();
       bossGroup.shutdownGracefully();
@@ -165,11 +133,7 @@ public class ChnlzrServer {
   }
 
   public static void main(String[] args) throws Exception {
-    new ChnlzrServer(
-        new ChnlzrServerConfig(),
-        (args.length > 0) ? Optional.of(args[0])                   : Optional.<String>empty(),
-        (args.length > 1) ? Optional.of(Integer.parseInt(args[1])) : Optional.<Integer>empty()
-    ).run();
+    new ChnlzrServer(new ChnlzrServerConfig()).run();
   }
 
 }
