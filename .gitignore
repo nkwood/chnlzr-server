@@ -1,7 +1,6 @@
 *\.properties*
 !example-chnlzr.properties
 
-import/
 target/
 .idea/
 

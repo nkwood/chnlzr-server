@@ -2,6 +2,16 @@
 
 Resample RF spectrum and stream it over network.
 
+## Setup
+```
+# useradd -m chnlzr
+# su chnlzr
+$ cd /home/chnlzr
+$ git clone https://github.com/rhodey/chnlzr-server
+$ cd chnlzr-server
+$ mvn package
+```
+
 ## Chose a sample source
 chnlzr uses the Java SPI pattern to allow for modular software defined
 radio support. To add support for your SDR extend `org.anhonesteffort.dsp.sample.TunableSamplesSource`
@@ -12,17 +22,20 @@ Currently the following drivers are available:
   + Mock Sample Source - [dsp-mock-source](https://github.com/rhodey/dsp-mock-source)
   + Ettus USRP SDRs - [dsp-usrp-source](https://github.com/rhodey/dsp-usrp-source)
 
-## Create chnlzr.properties
-Copy `example-chnlzr.properties` to `chnlzr.properties` and modify as you see fit.
-
-## Build
+## Configure
 ```
-$ mvn package
+$ cp example-chnlzr.properties chnlzr.properties
 ```
 
-## Run
+## Test
 ```
-$ ./run-server.sh
+$ ./run-debug.sh
+```
+
+## Install
+```
+# cp chnlzr.conf /etc/init/chnlzr.conf
+# start chnlzr
 ```
 
 ## License
