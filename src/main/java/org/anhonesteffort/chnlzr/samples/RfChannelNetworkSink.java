@@ -148,10 +148,6 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
     try {
 
       Stream.generate(this).forEach(samples -> {
-        if (Thread.interrupted()) {
-          throw new StreamInterruptedException("interrupted in consumer loop");
-        }
-
         StateChange change = stateChange.getAndSet(null);
         if (change != null) {
           onSourceStateChange(change);
