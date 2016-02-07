@@ -133,7 +133,7 @@ public class SamplesSourceController {
       if (!source.isTunable(accommodateDcOffset(requestedChannel)))
         return Error.ERROR_INCAPABLE;
 
-      if (tunedChannel.containsChannel(requestedChannel)) {
+      if (!sinks.isEmpty() && tunedChannel.containsChannel(requestedChannel)) {
         source.addSink(sink);
         sinks.add(sink);
         return 0x00;
