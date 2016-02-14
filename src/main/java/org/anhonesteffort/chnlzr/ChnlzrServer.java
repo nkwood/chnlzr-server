@@ -22,7 +22,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -98,7 +97,7 @@ public class ChnlzrServer {
                });
 
       ChannelFuture channelFuture = bootstrap.bind(config.serverPort()).sync();
-      Futures.addCallback(sourceFuture, new SourceStoppedCallback(channelFuture.channel()));
+      Futures.addCallback(sourceFuture, new SourceStoppedCallback());
       channelFuture.channel().closeFuture().sync();
 
     } finally {
@@ -113,22 +112,16 @@ public class ChnlzrServer {
 
   private static class SourceStoppedCallback implements FutureCallback<Void> {
     private static final Logger log = LoggerFactory.getLogger(SourceStoppedCallback.class);
-    private final Channel boundChannel;
-
-    public SourceStoppedCallback(Channel boundChannel) {
-      this.boundChannel = boundChannel;
-    }
-
     @Override
     public void onSuccess(Void nothing) {
       log.error("samples source stopped unexpectedly");
-      boundChannel.close();
+      System.exit(1);
     }
 
     @Override
     public void onFailure(Throwable throwable) {
       log.error("samples source stopped unexpectedly", throwable);
-      boundChannel.close();
+      System.exit(1);
     }
   }
 
