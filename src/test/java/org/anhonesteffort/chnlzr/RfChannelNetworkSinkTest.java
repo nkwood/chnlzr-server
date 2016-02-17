@@ -22,12 +22,12 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
+import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.capnproto.MessageBuilder;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.nio.FloatBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
@@ -62,7 +62,11 @@ public class RfChannelNetworkSinkTest {
     final long                  SOURCE_RATE  = 2000l;
     final long                  CHANNEL_RATE = 1000l;
     final ChannelRequest.Reader REQUEST      = request(CHANNEL_RATE);
-    final Samples               SAMPLES      = new Samples(FloatBuffer.wrap(new float[CONFIG.samplesPerMessage() * 2]));
+    final Samples               SAMPLES      = new Samples(new ComplexNumber[CONFIG.samplesPerMessage()]);
+
+    IntStream.range(0, SAMPLES.getSamples().length).forEach(i ->
+        SAMPLES.getSamples()[i] = new ComplexNumber(0f, 0f)
+    );
 
     final ChannelHandlerContext CONTEXT  = Mockito.mock(ChannelHandlerContext.class);
     final Channel               CHANNEL  = Mockito.mock(Channel.class);
@@ -99,7 +103,11 @@ public class RfChannelNetworkSinkTest {
   @Test
   public void testSampleQueueOverflow() {
     final ChnlzrServerConfig CONFIG  = config();
-    final Samples            SAMPLES = new Samples(FloatBuffer.wrap(new float[100]));
+    final Samples            SAMPLES = new Samples(new ComplexNumber[50]);
+
+    IntStream.range(0, SAMPLES.getSamples().length).forEach(i ->
+            SAMPLES.getSamples()[i] = new ComplexNumber(0f, 0f)
+    );
 
     final long                  CHANNEL_RATE = 1000;
     final ChannelRequest.Reader REQUEST      = request(CHANNEL_RATE);

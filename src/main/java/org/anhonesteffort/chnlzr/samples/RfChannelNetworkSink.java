@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -51,11 +50,11 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
 
   private static final Logger log = LoggerFactory.getLogger(RfChannelNetworkSink.class);
 
-  private final BlockingQueue<FloatBuffer> samplesQueue;
-  private final WriteQueuingContext        writeQueue;
-  private final ChannelSpec                spec;
-  private final long                       maxRateDiff;
-  private final int                        samplesPerMessage;
+  private final BlockingQueue<ComplexNumber[]> samplesQueue;
+  private final WriteQueuingContext            writeQueue;
+  private final ChannelSpec                    spec;
+  private final long                           maxRateDiff;
+  private final int                            samplesPerMessage;
 
   private AtomicReference<StateChange> stateChange;
   private Filter<ComplexNumber>        freqTranslation;
@@ -132,10 +131,9 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
   public List<ComplexNumber> get() {
     try {
 
-      FloatBuffer iqSamples = samplesQueue.take();
-      return IntStream.range(0, iqSamples.limit())
-                      .filter(i -> ((i & 1) == 0) && (i + 1) < iqSamples.limit())
-                      .mapToObj(i -> new ComplexNumber(iqSamples.get(i), iqSamples.get(i + 1)))
+      ComplexNumber[] iqSamples = samplesQueue.take();
+      return IntStream.range(0, iqSamples.length)
+                      .mapToObj(i -> iqSamples[i])
                       .collect(Collectors.toList());
 
     } catch (InterruptedException e) {

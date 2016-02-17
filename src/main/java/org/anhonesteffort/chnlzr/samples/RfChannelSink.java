@@ -18,7 +18,7 @@
 package org.anhonesteffort.chnlzr.samples;
 
 import org.anhonesteffort.dsp.ChannelSpec;
-import org.anhonesteffort.dsp.sample.DynamicSink;
+import org.anhonesteffort.dsp.DynamicSink;
 import org.anhonesteffort.dsp.sample.Samples;
 
 public interface RfChannelSink extends DynamicSink<Samples> {
