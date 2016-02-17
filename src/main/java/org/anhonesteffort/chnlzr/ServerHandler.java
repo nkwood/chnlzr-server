@@ -26,9 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 
 import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
 import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
@@ -39,18 +36,13 @@ public class ServerHandler extends ChannelHandlerAdapter {
   private static final Logger log = LoggerFactory.getLogger(ServerHandler.class);
 
   private final ChnlzrServerConfig      config;
-  private final ExecutorService         executor;
   private final SamplesSourceController sourceController;
   private final MessageBuilder          capabilities;
 
   private Optional<ChannelAllocationRef> allocation = Optional.empty();
 
-  public ServerHandler(ChnlzrServerConfig      config,
-                       ExecutorService         executor,
-                       SamplesSourceController sourceController)
-  {
+  public ServerHandler(ChnlzrServerConfig config, SamplesSourceController sourceController) {
     this.config           = config;
-    this.executor         = executor;
     this.sourceController = sourceController;
     capabilities          = CapnpUtil.capabilities(
         config.latitude(),     config.longitude(),
@@ -93,17 +85,8 @@ public class ServerHandler extends ChannelHandlerAdapter {
     int                  error        = sourceController.configureSourceForSink(channelSink);
 
     if (error == 0x00) {
-      try {
-
-        Future channelFuture = executor.submit(channelSink);
-               allocation    = Optional.of(new ChannelAllocationRef(channelQueue, channelSink, channelFuture));
-        log.info(CapnpUtil.spec(request) + " channel sink started");
-
-      } catch (RejectedExecutionException e) {
-        allocation = Optional.empty();
-        sourceController.releaseSink(channelSink);
-        context.writeAndFlush(CapnpUtil.error(Error.ERROR_PROCESSING_UNAVAILABLE));
-      }
+      allocation = Optional.of(new ChannelAllocationRef(channelQueue, channelSink));
+      log.info(CapnpUtil.spec(request) + " channel sink started");
     } else {
       context.writeAndFlush(CapnpUtil.error(error));
     }
@@ -145,25 +128,18 @@ public class ServerHandler extends ChannelHandlerAdapter {
   public void channelInactive(ChannelHandlerContext context) {
     if (allocation.isPresent()) {
       sourceController.releaseSink(allocation.get().getChannelSink());
-      allocation.get().getChannelFuture().cancel(true);
       log.info(allocation.get().getChannelSink().getChannelSpec() + " channel sink stopped");
       allocation = Optional.empty();
     }
   }
 
   private static class ChannelAllocationRef {
-
     private final WriteQueuingContext  channelQueue;
     private final RfChannelNetworkSink channelSink;
-    private final Future               channelFuture;
 
-    public ChannelAllocationRef(WriteQueuingContext  channelQueue,
-                                RfChannelNetworkSink channelSink,
-                                Future               channelFuture)
-    {
-      this.channelQueue  = channelQueue;
-      this.channelSink   = channelSink;
-      this.channelFuture = channelFuture;
+    public ChannelAllocationRef(WriteQueuingContext channelQueue, RfChannelNetworkSink channelSink) {
+      this.channelQueue = channelQueue;
+      this.channelSink  = channelSink;
     }
 
     public WriteQueuingContext getChannelQueue() {
@@ -173,10 +149,6 @@ public class ServerHandler extends ChannelHandlerAdapter {
     public RfChannelNetworkSink getChannelSink() {
       return channelSink;
     }
-
-    public Future getChannelFuture() {
-      return channelFuture;
-    }
-
   }
+
 }

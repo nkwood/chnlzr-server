@@ -20,7 +20,10 @@ package org.anhonesteffort.chnlzr;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.lmax.disruptor.SleepingWaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -40,42 +43,45 @@ import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.concurrent.ExecutorService;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ChnlzrServer {
 
+  private final ListeningExecutorService sourcePool = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+
   private final ChnlzrServerConfig   config;
-  private final ExecutorService      dspExecutor;
   private final TunableSamplesSource source;
+  private final Disruptor            disruptor;
   private final ServerHandlerFactory handlers;
 
   public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
     this.config = config;
-    dspExecutor = Executors.newFixedThreadPool(config.dspExecutorPoolSize());
 
-    TunableSamplesSourceFactory sourceFactory = new TunableSamplesSourceFactory();
-    List<TunableSamplesSource>  sources       = sourceFactory.get();
+    TunableSamplesSourceFactory    sourceFactory = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), config.ringBufferSize(), config.cicPoolSize());
+    Optional<TunableSamplesSource> source        = sourceFactory.getSource();
 
-    if (!sources.isEmpty()) {
+    if (source.isPresent()) {
       SamplesSourceController sourceController = new SamplesSourceController(
-          sources.get(0), (config.dspExecutorPoolSize() - 1), config.dcOffset()
+          source.get(), config.cicPoolSize(), config.dcOffset()
       );
 
-      this.source = sources.get(0);
-      handlers    = new ServerHandlerFactory(config, dspExecutor, sourceController);
+      this.source    = source.get();
+      this.disruptor = sourceFactory.getDisruptor();
+      handlers       = new ServerHandlerFactory(config, sourceController);
     } else {
       throw new SamplesSourceException("no samples sources available");
     }
   }
 
   public void run() throws InterruptedException {
-    ListenableFuture sourceFuture = MoreExecutors.listeningDecorator(dspExecutor).submit(source);
-    EventLoopGroup   bossGroup    = new NioEventLoopGroup();
-    EventLoopGroup   workerGroup  = new NioEventLoopGroup();
-    ServerBootstrap  bootstrap    = new ServerBootstrap();
+    disruptor.start();
+    ListenableFuture sourceFuture = sourcePool.submit(source);
+
+    EventLoopGroup  bossGroup   = new NioEventLoopGroup();
+    EventLoopGroup  workerGroup = new NioEventLoopGroup();
+    ServerBootstrap bootstrap   = new ServerBootstrap();
 
     try {
 
@@ -102,10 +108,11 @@ public class ChnlzrServer {
       channelFuture.channel().closeFuture().sync();
 
     } finally {
-      dspExecutor.shutdownNow();
       workerGroup.shutdownGracefully();
       bossGroup.shutdownGracefully();
       sourceFuture.cancel(true);
+      sourcePool.shutdownNow();
+      disruptor.shutdown();
     }
 
     System.exit(1);

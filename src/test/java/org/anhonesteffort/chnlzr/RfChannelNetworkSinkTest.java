@@ -19,17 +19,13 @@ package org.anhonesteffort.chnlzr;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
 import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;
-import org.capnproto.MessageBuilder;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 
 import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
@@ -40,12 +36,6 @@ public class RfChannelNetworkSinkTest {
     final ChnlzrServerConfig CONFIG = Mockito.mock(ChnlzrServerConfig.class);
 
     Mockito.when(CONFIG.samplesPerMessage()).thenReturn(10000);
-    Mockito.when(CONFIG.clientWriteQueueSize()).thenReturn(16);
-    Mockito.when(CONFIG.samplesQueueSize()).thenReturn(16);
-    Mockito.when(CONFIG.latitude()).thenReturn(22.208335d);
-    Mockito.when(CONFIG.longitude()).thenReturn(-159.507002d);
-    Mockito.when(CONFIG.polarization()).thenReturn(1);
-    Mockito.when(CONFIG.dcOffset()).thenReturn(0.0d);
 
     return CONFIG;
   }
@@ -68,10 +58,9 @@ public class RfChannelNetworkSinkTest {
         SAMPLES.getSamples()[i] = new ComplexNumber(0f, 0f)
     );
 
-    final ChannelHandlerContext CONTEXT  = Mockito.mock(ChannelHandlerContext.class);
-    final Channel               CHANNEL  = Mockito.mock(Channel.class);
-    final ChannelFuture         FUTURE   = Mockito.mock(ChannelFuture.class);
-    final ExecutorService       EXECUTOR = Executors.newSingleThreadExecutor();
+    final ChannelHandlerContext CONTEXT = Mockito.mock(ChannelHandlerContext.class);
+    final Channel               CHANNEL = Mockito.mock(Channel.class);
+    final ChannelFuture         FUTURE  = Mockito.mock(ChannelFuture.class);
 
     Mockito.when(CHANNEL.closeFuture()).thenReturn(FUTURE);
     Mockito.when(CHANNEL.isWritable()).thenReturn(true);
@@ -80,10 +69,8 @@ public class RfChannelNetworkSinkTest {
     final WriteQueuingContext  QUEUE = new WriteQueuingContext(CONTEXT, 16);
     final RfChannelNetworkSink SINK  = new RfChannelNetworkSink(CONFIG, QUEUE, REQUEST);
 
-    EXECUTOR.submit(SINK);
     SINK.onSourceStateChange(SOURCE_RATE, 9001d);
     SINK.consume(SAMPLES);
-    Thread.sleep(100l);
 
     Mockito.verify(CONTEXT, Mockito.times(1)).writeAndFlush(Mockito.any());
 
@@ -91,44 +78,9 @@ public class RfChannelNetworkSinkTest {
     final int DECIMATION         = (int) (SOURCE_RATE / CHANNEL_RATE);
     final int SAMPLES_TO_CONSUME = SAMPLES_TO_FEED / DECIMATION;
 
-    IntStream.range(0, SAMPLES_TO_FEED - 1).forEach(i -> {
-      SINK.consume(SAMPLES);
-      try { Thread.sleep(100l); } catch (InterruptedException e) { assert false; }
-    });
+    IntStream.range(0, SAMPLES_TO_FEED - 1).forEach(i -> SINK.consume(SAMPLES));
 
     Mockito.verify(CONTEXT, Mockito.times(SAMPLES_TO_CONSUME + 1)).writeAndFlush(Mockito.any());
-    EXECUTOR.shutdownNow();
-  }
-
-  @Test
-  public void testSampleQueueOverflow() {
-    final ChnlzrServerConfig CONFIG  = config();
-    final Samples            SAMPLES = new Samples(new ComplexNumber[50]);
-
-    IntStream.range(0, SAMPLES.getSamples().length).forEach(i ->
-            SAMPLES.getSamples()[i] = new ComplexNumber(0f, 0f)
-    );
-
-    final long                  CHANNEL_RATE = 1000;
-    final ChannelRequest.Reader REQUEST      = request(CHANNEL_RATE);
-    final ChannelHandlerContext CONTEXT      = Mockito.mock(ChannelHandlerContext.class);
-    final Channel               CHANNEL      = Mockito.mock(Channel.class);
-    final ChannelFuture         FUTURE       = Mockito.mock(ChannelFuture.class);
-
-    Mockito.when(CONTEXT.writeAndFlush(Mockito.any(MessageBuilder.class))).thenReturn(FUTURE);
-    Mockito.when(CHANNEL.closeFuture()).thenReturn(FUTURE);
-    Mockito.when(CHANNEL.isWritable()).thenReturn(true);
-    Mockito.when(CONTEXT.channel()).thenReturn(CHANNEL);
-
-    final WriteQueuingContext  QUEUE = new WriteQueuingContext(CONTEXT, 16);
-    final RfChannelNetworkSink SINK  = new RfChannelNetworkSink(CONFIG, QUEUE, REQUEST);
-
-    IntStream.range(0, CONFIG.samplesQueueSize())
-             .forEach(i -> SINK.consume(SAMPLES));
-
-    Mockito.verify(FUTURE, Mockito.never()).addListener(Mockito.eq(ChannelFutureListener.CLOSE));
-    SINK.consume(SAMPLES);
-    Mockito.verify(FUTURE, Mockito.times(1)).addListener(Mockito.eq(ChannelFutureListener.CLOSE));
   }
 
 }

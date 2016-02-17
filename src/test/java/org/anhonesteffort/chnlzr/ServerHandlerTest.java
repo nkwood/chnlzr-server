@@ -26,9 +26,6 @@ import org.capnproto.MessageBuilder;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-
 import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
 import static org.anhonesteffort.chnlzr.Proto.Error;
 import static org.anhonesteffort.chnlzr.Proto.BaseMessage.Type;
@@ -42,7 +39,6 @@ public class ServerHandlerTest {
     Mockito.when(CONFIG.longitude()).thenReturn(-122.261150d);
     Mockito.when(CONFIG.polarization()).thenReturn(1);
     Mockito.when(CONFIG.clientWriteQueueSize()).thenReturn(8);
-    Mockito.when(CONFIG.samplesQueueSize()).thenReturn(8);
     Mockito.when(CONFIG.samplesPerMessage()).thenReturn(1000);
 
     return CONFIG;
@@ -61,13 +57,12 @@ public class ServerHandlerTest {
   @Test
   public void testCapabilitiesSentFirst() {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
 
-    final ChannelHandler  HANDLER      = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER      = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL      = new EmbeddedChannel(HANDLER);
     final MessageBuilder  RECEIVED_MSG = CHANNEL.readOutbound();
 
@@ -77,13 +72,12 @@ public class ServerHandlerTest {
   @Test
   public void testRequestFailsLocationTooDistant() {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -99,19 +93,17 @@ public class ServerHandlerTest {
     assert BASE_MSG.getError().getCode() == Error.ERROR_INCAPABLE;
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.never()).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.never()).submit(Mockito.any(Runnable.class));
   }
 
   @Test
   public void testRequestFailsPolarizationDifferent() {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -127,19 +119,17 @@ public class ServerHandlerTest {
     assert BASE_MSG.getError().getCode() == Error.ERROR_INCAPABLE;
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.never()).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.never()).submit(Mockito.any(Runnable.class));
   }
 
   @Test
   public void testRequestSucceedsPolarizationIndifferent() {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -149,20 +139,18 @@ public class ServerHandlerTest {
     );
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.times(1)).submit(Mockito.any(Runnable.class));
   }
 
   @Test
   public void testRequestSucceedsLocationIndifferent() {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
     Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -172,20 +160,18 @@ public class ServerHandlerTest {
     );
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.times(1)).submit(Mockito.any(Runnable.class));
   }
 
   @Test
   public void testRequestSucceedsLocationSpecific() {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
     Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -195,22 +181,18 @@ public class ServerHandlerTest {
     );
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.times(1)).submit(Mockito.any(Runnable.class));
   }
 
   @Test
   public void testRequestResourcesReleasedOnClose() throws Exception {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
-    final Future                  FUTURE            = Mockito.mock(Future.class);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
     Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
-    Mockito.when(EXECUTOR.submit(Mockito.any(Runnable.class))).thenReturn(FUTURE);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -220,28 +202,23 @@ public class ServerHandlerTest {
     );
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.times(1)).submit(Mockito.any(Runnable.class));
-
     Mockito.verify(SOURCE_CONTROLLER, Mockito.never()).releaseSink(Mockito.any());
-    Mockito.verify(FUTURE, Mockito.never()).cancel(Mockito.anyBoolean());
 
     HANDLER.channelInactive(Mockito.mock(ChannelHandlerContext.class));
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).releaseSink(Mockito.any());
-    Mockito.verify(FUTURE, Mockito.times(1)).cancel(Mockito.anyBoolean());
   }
 
   @Test
   public void testContextClosedOnChannelRequestAfterChannelAllocation() throws Exception {
     final ChnlzrServerConfig      CONFIG            = config();
-    final ExecutorService         EXECUTOR          = Mockito.mock(ExecutorService.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
     Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, EXECUTOR, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -251,7 +228,6 @@ public class ServerHandlerTest {
     );
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-    Mockito.verify(EXECUTOR, Mockito.times(1)).submit(Mockito.any(Runnable.class));
 
     final ChannelHandlerContext CONTEXT = Mockito.mock(ChannelHandlerContext.class);
     HANDLER.channelRead(CONTEXT, request(1337d, 9001d, 0d, 1).getRoot(BaseMessage.factory).asReader());

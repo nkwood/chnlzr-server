@@ -17,9 +17,12 @@
 
 package org.anhonesteffort.chnlzr;
 
+import com.lmax.disruptor.SleepingWaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
 import org.anhonesteffort.chnlzr.samples.RfChannelSink;
 import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.anhonesteffort.dsp.ChannelSpec;
+import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
@@ -35,19 +38,23 @@ public class SamplesSourceControllerTest {
 
   public static class DumbTunableSamplesSourceProvider implements TunableSamplesSourceProvider {
     @Override
-    public Optional<TunableSamplesSource> get() {
-      return Optional.of(new DumbTunableSamplesSource());
+    public Optional<TunableSamplesSource> get(Disruptor<Samples> disruptor, Integer concurrency) {
+      return Optional.of(new DumbTunableSamplesSource(disruptor, concurrency));
+    }
+
+    @Override
+    public Samples newInstance() {
+      return new Samples(new ComplexNumber[50]);
     }
   }
 
   public static class DumbTunableSamplesSource extends TunableSamplesSource {
-
     public static final Long   MAX_SAMPLE_RATE =   400_000l;
     public static final Double MIN_FREQ        =   100_000d;
     public static final Double MAX_FREQ        = 1_000_000d;
 
-    public DumbTunableSamplesSource() {
-      super(MAX_SAMPLE_RATE, MIN_FREQ, MAX_FREQ);
+    public DumbTunableSamplesSource(Disruptor<Samples> disruptor, Integer concurrency) {
+      super(MAX_SAMPLE_RATE, MIN_FREQ, MAX_FREQ, disruptor, concurrency);
     }
 
     @Override
@@ -75,7 +82,6 @@ public class SamplesSourceControllerTest {
   }
 
   private static class DumbChannelSink implements RfChannelSink {
-
     private final ChannelSpec spec;
 
     public DumbChannelSink(ChannelSpec spec) {
@@ -92,7 +98,6 @@ public class SamplesSourceControllerTest {
 
     @Override
     public void consume(Samples samples) { }
-
   }
 
   private static RfChannelSink sinkFor(Double minFreq, Double maxFreq) {
@@ -102,7 +107,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithSingleSink() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 1, DC_OFFSET);
 
     final RfChannelSink SINK0 = sinkFor(500_000d, 600_000d);
@@ -137,7 +142,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithMultipleSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 5, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
@@ -160,7 +165,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testMaxSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory().get().get(0);
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 3, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);

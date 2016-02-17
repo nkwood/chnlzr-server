@@ -23,8 +23,8 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
 
   private final int    serverPort;
   private final int    samplesPerMessage;
-  private final int    samplesQueueSize;
-  private final int    dspExecutorPoolSize;
+  private final int    ringBufferSize;
+  private final int    cicPoolSize;
   private final double latitude;
   private final double longitude;
   private final int    polarization;
@@ -33,14 +33,14 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
   public ChnlzrServerConfig() throws IOException {
     super();
 
-    serverPort          = Integer.parseInt(properties.getProperty("server_port"));
-    samplesPerMessage   = Integer.parseInt(properties.getProperty("samples_per_message"));
-    samplesQueueSize    = Integer.parseInt(properties.getProperty("samples_queue_size"));
-    dspExecutorPoolSize = Integer.parseInt(properties.getProperty("dsp_executor_pool_size"));
-    latitude            = Double.parseDouble(properties.getProperty("latitude"));
-    longitude           = Double.parseDouble(properties.getProperty("longitude"));
-    polarization        = Integer.parseInt(properties.getProperty("polarization"));
-    dcOffset            = Double.parseDouble(properties.getProperty("dc_offset"));
+    serverPort        = Integer.parseInt(properties.getProperty("server_port"));
+    samplesPerMessage = Integer.parseInt(properties.getProperty("samples_per_message"));
+    ringBufferSize    = Integer.parseInt(properties.getProperty("ring_buffer_size"));
+    cicPoolSize       = Integer.parseInt(properties.getProperty("cic_pool_size"));
+    latitude          = Double.parseDouble(properties.getProperty("latitude"));
+    longitude         = Double.parseDouble(properties.getProperty("longitude"));
+    polarization      = Integer.parseInt(properties.getProperty("polarization"));
+    dcOffset          = Double.parseDouble(properties.getProperty("dc_offset"));
   }
 
   public int serverPort() {
@@ -51,12 +51,12 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
     return samplesPerMessage;
   }
 
-  public int samplesQueueSize() {
-    return samplesQueueSize;
+  public int ringBufferSize() {
+    return ringBufferSize;
   }
 
-  public int dspExecutorPoolSize() {
-    return dspExecutorPoolSize;
+  public int cicPoolSize() {
+    return cicPoolSize;
   }
 
   public double latitude() {

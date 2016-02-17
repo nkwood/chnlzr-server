@@ -22,7 +22,6 @@ import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
 import org.anhonesteffort.chnlzr.WriteQueuingContext;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
-import org.anhonesteffort.dsp.StreamInterruptedException;
 import org.anhonesteffort.dsp.filter.ComplexNumberFrequencyTranslatingFilter;
 import org.anhonesteffort.dsp.filter.Filter;
 import org.anhonesteffort.dsp.filter.FilterFactory;
@@ -33,28 +32,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
-import static org.anhonesteffort.chnlzr.Proto.Error;
 import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
 
-public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<List<ComplexNumber>> {
+public class RfChannelNetworkSink implements RfChannelSink {
 
   private static final Logger log = LoggerFactory.getLogger(RfChannelNetworkSink.class);
 
-  private final BlockingQueue<ComplexNumber[]> samplesQueue;
-  private final WriteQueuingContext            writeQueue;
-  private final ChannelSpec                    spec;
-  private final long                           maxRateDiff;
-  private final int                            samplesPerMessage;
+  private final WriteQueuingContext writeQueue;
+  private final ChannelSpec         spec;
+  private final long                maxRateDiff;
+  private final int                 samplesPerMessage;
 
   private AtomicReference<StateChange> stateChange;
   private Filter<ComplexNumber>        freqTranslation;
@@ -66,7 +56,6 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
                               ChannelRequest.Reader request)
   {
     this.writeQueue   = writeQueue;
-    samplesQueue      = new LinkedBlockingQueue<>(config.samplesQueueSize());
     spec              = CapnpUtil.spec(request);
     maxRateDiff       = request.getMaxRateDiff();
     samplesPerMessage = config.samplesPerMessage();
@@ -120,48 +109,14 @@ public class RfChannelNetworkSink implements RfChannelSink, Runnable, Supplier<L
 
   @Override
   public void consume(Samples samples) {
-    if (!samplesQueue.offer(samples.getSamples())) {
-      log.warn(spec + " sample queue has overflowed, closing connection");
-      writeQueue.writeAndClose(CapnpUtil.error(Error.ERROR_PROCESSING_UNAVAILABLE));
-      samplesQueue.clear();
+    StateChange change = stateChange.getAndSet(null);
+
+    if (change != null) {
+      onSourceStateChange(change);
     }
-  }
 
-  @Override
-  public List<ComplexNumber> get() {
-    try {
-
-      ComplexNumber[] iqSamples = samplesQueue.take();
-      return IntStream.range(0, iqSamples.length)
-                      .mapToObj(i -> iqSamples[i])
-                      .collect(Collectors.toList());
-
-    } catch (InterruptedException e) {
-      throw new StreamInterruptedException("interrupted while supplying ComplexNumber stream", e);
-    }
-  }
-
-  @Override
-  public void run() {
-    try {
-
-      Stream.generate(this).forEach(samples -> {
-        StateChange change = stateChange.getAndSet(null);
-        if (change != null) {
-          onSourceStateChange(change);
-        }
-
-        samples.forEach(freqTranslation::consume);
-      });
-
-    } catch (StreamInterruptedException e) {
-      log.debug(spec + " interrupted, assuming execution was canceled");
-    } finally {
-      samplesQueue.clear();
-      stateChange     = null;
-      freqTranslation = null;
-      nextMessage     = null;
-      nextSamples     = null;
+    for (int i = 0; i < samples.getSamples().length; i++) {
+      freqTranslation.consume(samples.getSamples()[i]);
     }
   }
 
