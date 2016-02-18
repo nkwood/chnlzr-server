@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.bootstrap.ServerBootstrap;
@@ -37,6 +38,7 @@ import org.anhonesteffort.chnlzr.pipeline.BaseMessageDecoder;
 import org.anhonesteffort.chnlzr.pipeline.BaseMessageEncoder;
 import org.anhonesteffort.chnlzr.pipeline.IdleStateHeartbeatWriter;
 import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
+import org.anhonesteffort.dsp.sample.Samples;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
 import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
@@ -49,11 +51,12 @@ import java.util.concurrent.TimeUnit;
 
 public class ChnlzrServer {
 
+  private static final Logger log = LoggerFactory.getLogger(ChnlzrServer.class);
   private final ListeningExecutorService sourcePool = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
 
   private final ChnlzrServerConfig   config;
   private final TunableSamplesSource source;
-  private final Disruptor            disruptor;
+  private final Disruptor<Samples>   disruptor;
   private final ServerHandlerFactory handlers;
 
   public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
@@ -76,12 +79,13 @@ public class ChnlzrServer {
   }
 
   public void run() throws InterruptedException {
+    disruptor.setDefaultExceptionHandler(new DisruptorExceptionHandler());
     disruptor.start();
-    ListenableFuture sourceFuture = sourcePool.submit(source);
 
-    EventLoopGroup  bossGroup   = new NioEventLoopGroup();
-    EventLoopGroup  workerGroup = new NioEventLoopGroup();
-    ServerBootstrap bootstrap   = new ServerBootstrap();
+    ListenableFuture sourceFuture = sourcePool.submit(source);
+    EventLoopGroup   bossGroup    = new NioEventLoopGroup();
+    EventLoopGroup   workerGroup  = new NioEventLoopGroup();
+    ServerBootstrap  bootstrap    = new ServerBootstrap();
 
     try {
 
@@ -119,7 +123,6 @@ public class ChnlzrServer {
   }
 
   private static class SourceStoppedCallback implements FutureCallback<Void> {
-    private static final Logger log = LoggerFactory.getLogger(SourceStoppedCallback.class);
     @Override
     public void onSuccess(Void nothing) {
       log.error("samples source stopped unexpectedly");
@@ -129,6 +132,26 @@ public class ChnlzrServer {
     @Override
     public void onFailure(Throwable throwable) {
       log.error("samples source stopped unexpectedly", throwable);
+      System.exit(1);
+    }
+  }
+
+  private static class DisruptorExceptionHandler implements ExceptionHandler<Samples> {
+    @Override
+    public void handleEventException(Throwable throwable, long l, Samples samples) {
+      log.error("disruptor error", throwable);
+      System.exit(1);
+    }
+
+    @Override
+    public void handleOnStartException(Throwable throwable) {
+      log.error("disruptor error", throwable);
+      System.exit(1);
+    }
+
+    @Override
+    public void handleOnShutdownException(Throwable throwable) {
+      log.error("disruptor error", throwable);
       System.exit(1);
     }
   }
