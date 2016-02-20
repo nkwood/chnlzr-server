@@ -38,8 +38,8 @@ public class SamplesSourceControllerTest {
 
   public static class DumbTunableSamplesSourceProvider implements TunableSamplesSourceProvider {
     @Override
-    public Optional<TunableSamplesSource> get(Disruptor<Samples> disruptor, Integer concurrency) {
-      return Optional.of(new DumbTunableSamplesSource(disruptor, concurrency));
+    public Optional<TunableSamplesSource> get(Disruptor<Samples> disruptor, int affinity, int concurrency) {
+      return Optional.of(new DumbTunableSamplesSource(disruptor, affinity, concurrency));
     }
 
     @Override
@@ -53,8 +53,8 @@ public class SamplesSourceControllerTest {
     public static final Double MIN_FREQ        =   100_000d;
     public static final Double MAX_FREQ        = 1_000_000d;
 
-    public DumbTunableSamplesSource(Disruptor<Samples> disruptor, Integer concurrency) {
-      super(MAX_SAMPLE_RATE, MIN_FREQ, MAX_FREQ, disruptor, concurrency);
+    public DumbTunableSamplesSource(Disruptor<Samples> disruptor, int affinity, int concurrency) {
+      super(MAX_SAMPLE_RATE, MIN_FREQ, MAX_FREQ, disruptor, affinity, concurrency);
     }
 
     @Override
@@ -105,7 +105,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithSingleSink() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 10).getSource().get();
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 1, DC_OFFSET);
 
     final RfChannelSink SINK0 = sinkFor(500_000d, 600_000d);
@@ -140,7 +140,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testWithMultipleSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 10).getSource().get();
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 5, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
@@ -163,7 +163,7 @@ public class SamplesSourceControllerTest {
   @Test
   public void testMaxSinks() throws Exception {
     final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 10).getSource().get();
+    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 3, DC_OFFSET);
     final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
     final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);

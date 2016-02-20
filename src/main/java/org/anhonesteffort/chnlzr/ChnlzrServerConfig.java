@@ -24,6 +24,7 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
   private final int    serverPort;
   private final int    samplesPerMessage;
   private final int    ringBufferSize;
+  private final int    sourceCpuAffinity;
   private final int    cicPoolSize;
   private final double latitude;
   private final double longitude;
@@ -36,6 +37,7 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
     serverPort        = Integer.parseInt(properties.getProperty("server_port"));
     samplesPerMessage = Integer.parseInt(properties.getProperty("samples_per_message"));
     ringBufferSize    = Integer.parseInt(properties.getProperty("ring_buffer_size"));
+    sourceCpuAffinity = Integer.parseInt(properties.getProperty("source_cpu_affinity"));
     cicPoolSize       = Integer.parseInt(properties.getProperty("cic_pool_size"));
     latitude          = Double.parseDouble(properties.getProperty("latitude"));
     longitude         = Double.parseDouble(properties.getProperty("longitude"));
@@ -53,6 +55,10 @@ public class ChnlzrServerConfig extends ChnlzrConfig {
 
   public int ringBufferSize() {
     return ringBufferSize;
+  }
+
+  public int sourceCpuAffinity() {
+    return sourceCpuAffinity;
   }
 
   public int cicPoolSize() {

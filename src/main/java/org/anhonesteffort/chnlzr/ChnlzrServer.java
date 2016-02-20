@@ -62,7 +62,7 @@ public class ChnlzrServer {
   public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
     this.config = config;
 
-    TunableSamplesSourceFactory    sourceFactory = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), config.ringBufferSize(), config.cicPoolSize());
+    TunableSamplesSourceFactory    sourceFactory = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), config.ringBufferSize(), config.sourceCpuAffinity(), config.cicPoolSize());
     Optional<TunableSamplesSource> source        = sourceFactory.getSource();
 
     if (source.isPresent()) {
