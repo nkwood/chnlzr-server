@@ -76,9 +76,7 @@ public class SamplesSourceControllerTest {
     }
 
     @Override
-    public Void call() {
-      return null;
-    }
+    protected void fillBuffer(Samples samples) throws SamplesSourceException { }
   }
 
   private static class DumbChannelSink implements RfChannelSink {
