@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
@@ -62,7 +63,7 @@ public class ChnlzrServer {
   public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
     this.config = config;
 
-    TunableSamplesSourceFactory    sourceFactory = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), config.ringBufferSize(), config.sourceCpuAffinity(), config.cicPoolSize());
+    TunableSamplesSourceFactory    sourceFactory = new TunableSamplesSourceFactory(new BlockingWaitStrategy(), config.ringBufferSize(), config.sourceCpuAffinity(), config.cicPoolSize());
     Optional<TunableSamplesSource> source        = sourceFactory.getSource();
 
     if (source.isPresent()) {
