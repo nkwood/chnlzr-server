@@ -17,13 +17,9 @@
 
 package org.anhonesteffort.chnlzr.resample;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
-import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.dsp.ComplexNumber;
+import org.anhonesteffort.dsp.DynamicSink;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -32,15 +28,9 @@ import java.util.stream.IntStream;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
-public class ResamplingNetworkSinkTest {
+public class RfResamplingSinkTest {
 
   private static final ProtoFactory PROTO = new ProtoFactory();
-
-  private ChnlzrServerConfig config() {
-    final ChnlzrServerConfig CONFIG = Mockito.mock(ChnlzrServerConfig.class);
-    Mockito.when(CONFIG.samplesPerMessage()).thenReturn(10000);
-    return CONFIG;
-  }
 
   private static ChannelRequest.Reader request(long sampleRate) {
     return PROTO.channelRequest(
@@ -49,40 +39,34 @@ public class ResamplingNetworkSinkTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   public void testRateChange() throws Exception {
-    final ChnlzrServerConfig    CONFIG       = config();
     final long                  SOURCE_RATE  = 2000l;
     final long                  CHANNEL_RATE = 1000l;
     final ChannelRequest.Reader REQUEST      = request(CHANNEL_RATE);
-    final Samples               SAMPLES      = new Samples(new ComplexNumber[CONFIG.samplesPerMessage()]);
+    final Samples               SAMPLES      = new Samples(new ComplexNumber[200]);
 
     IntStream.range(0, SAMPLES.getSamples().length).forEach(i ->
         SAMPLES.getSamples()[i] = new ComplexNumber(0f, 0f)
     );
 
-    final ChannelHandlerContext CONTEXT = Mockito.mock(ChannelHandlerContext.class);
-    final Channel               CHANNEL = Mockito.mock(Channel.class);
-    final ChannelFuture         FUTURE  = Mockito.mock(ChannelFuture.class);
+    final DynamicSink<ComplexNumber> NEXT_SINK = Mockito.mock(DynamicSink.class);
+    final RfResamplingSink           SINK      = new RfResamplingSink(REQUEST, NEXT_SINK);
 
-    Mockito.when(CHANNEL.closeFuture()).thenReturn(FUTURE);
-    Mockito.when(CHANNEL.isWritable()).thenReturn(true);
-    Mockito.when(CONTEXT.channel()).thenReturn(CHANNEL);
-
-    final WriteQueuingContext   QUEUE = new WriteQueuingContext(CONTEXT, 16);
-    final ResamplingNetworkSink SINK  = new ResamplingNetworkSink(QUEUE, REQUEST, CONFIG.samplesPerMessage());
+    Mockito.verify(NEXT_SINK, Mockito.never()).onSourceStateChange(Mockito.any(), Mockito.any());
 
     SINK.onSourceStateChange(SOURCE_RATE, 9001d);
     SINK.consume(SAMPLES);
 
-    Mockito.verify(CONTEXT, Mockito.times(1)).writeAndFlush(Mockito.any());
+    Mockito.verify(NEXT_SINK, Mockito.times(1)).onSourceStateChange(Mockito.any(), Mockito.any());
 
     final int SAMPLES_TO_FEED    = 16;
     final int DECIMATION         = (int) (SOURCE_RATE / CHANNEL_RATE);
-    final int SAMPLES_TO_CONSUME = SAMPLES_TO_FEED / DECIMATION;
+    final int SAMPLES_TO_CONSUME = (SAMPLES_TO_FEED * SAMPLES.getSamples().length) / DECIMATION;
 
     IntStream.range(0, SAMPLES_TO_FEED - 1).forEach(i -> SINK.consume(SAMPLES));
 
-    Mockito.verify(CONTEXT, Mockito.times(SAMPLES_TO_CONSUME + 1)).writeAndFlush(Mockito.any());
+    Mockito.verify(NEXT_SINK, Mockito.times(SAMPLES_TO_CONSUME)).consume(Mockito.any());
   }
 
 }

@@ -19,7 +19,7 @@ package org.anhonesteffort.chnlzr.input;
 
 import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
-import org.anhonesteffort.chnlzr.resample.RfChannelSink;
+import org.anhonesteffort.chnlzr.resample.ResamplingSink;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;
@@ -78,7 +78,7 @@ public class SamplesSourceControllerTest {
     protected void fillBuffer(Samples samples) throws SamplesSourceException { }
   }
 
-  private static class DumbChannelSink implements RfChannelSink {
+  private static class DumbChannelSink implements ResamplingSink {
     private final ChannelSpec spec;
 
     public DumbChannelSink(ChannelSpec spec) {
@@ -97,7 +97,7 @@ public class SamplesSourceControllerTest {
     public void consume(Samples samples) { }
   }
 
-  private static RfChannelSink sinkFor(Double minFreq, Double maxFreq) {
+  private static ResamplingSink sinkFor(Double minFreq, Double maxFreq) {
     return new DumbChannelSink(ChannelSpec.fromMinMax(minFreq, maxFreq));
   }
 
@@ -107,31 +107,31 @@ public class SamplesSourceControllerTest {
     final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 1, DC_OFFSET);
 
-    final RfChannelSink SINK0 = sinkFor(500_000d, 600_000d);
+    final ResamplingSink SINK0 = sinkFor(500_000d, 600_000d);
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
     CONTROLLER.releaseSink(SINK0);
 
-    final RfChannelSink SINK1 = sinkFor(100_000d, 200_000d);
+    final ResamplingSink SINK1 = sinkFor(100_000d, 200_000d);
     assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;
     CONTROLLER.releaseSink(SINK1);
 
-    final RfChannelSink SINK2 = sinkFor(900_000d, 1_000_000d);
+    final ResamplingSink SINK2 = sinkFor(900_000d, 1_000_000d);
     assert CONTROLLER.configureSourceForSink(SINK2) == 0x00;
     CONTROLLER.releaseSink(SINK2);
 
-    final RfChannelSink SINK3 = sinkFor(100_000d, 300_000d);
+    final ResamplingSink SINK3 = sinkFor(100_000d, 300_000d);
     assert CONTROLLER.configureSourceForSink(SINK3) == 0x00;
     CONTROLLER.releaseSink(SINK3);
 
-    final RfChannelSink SINK4 = sinkFor(99_999d,  199_999d);
+    final ResamplingSink SINK4 = sinkFor(99_999d,  199_999d);
     assert CONTROLLER.configureSourceForSink(SINK4) == Error.ERROR_INCAPABLE;
     CONTROLLER.releaseSink(SINK4);
 
-    final RfChannelSink SINK5 = sinkFor(900_001d, 1_000_001d);
+    final ResamplingSink SINK5 = sinkFor(900_001d, 1_000_001d);
     assert CONTROLLER.configureSourceForSink(SINK5) == Error.ERROR_INCAPABLE;
     CONTROLLER.releaseSink(SINK5);
 
-    final RfChannelSink SINK6 = sinkFor(100_000d, 300_001d);
+    final ResamplingSink SINK6 = sinkFor(100_000d, 300_001d);
     assert CONTROLLER.configureSourceForSink(SINK6) == Error.ERROR_INCAPABLE;
     CONTROLLER.releaseSink(SINK6);
   }
@@ -141,10 +141,10 @@ public class SamplesSourceControllerTest {
     final Double                  DC_OFFSET  = 0d;
     final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 5, DC_OFFSET);
-    final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
-    final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
-    final RfChannelSink           SINK2      = sinkFor(700_000d, 800_000d);
-    final RfChannelSink           SINK3      = sinkFor(800_000d, 900_000d);
+    final ResamplingSink          SINK0      = sinkFor(500_000d, 600_000d);
+    final ResamplingSink          SINK1      = sinkFor(600_000d, 700_000d);
+    final ResamplingSink          SINK2      = sinkFor(700_000d, 800_000d);
+    final ResamplingSink          SINK3      = sinkFor(800_000d, 900_000d);
 
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
     assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;
@@ -164,10 +164,10 @@ public class SamplesSourceControllerTest {
     final Double                  DC_OFFSET  = 0d;
     final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
     final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 3, DC_OFFSET);
-    final RfChannelSink           SINK0      = sinkFor(500_000d, 600_000d);
-    final RfChannelSink           SINK1      = sinkFor(600_000d, 700_000d);
-    final RfChannelSink           SINK2      = sinkFor(700_000d, 800_000d);
-    final RfChannelSink           SINK3      = sinkFor(800_000d, 900_000d);
+    final ResamplingSink          SINK0      = sinkFor(500_000d, 600_000d);
+    final ResamplingSink          SINK1      = sinkFor(600_000d, 700_000d);
+    final ResamplingSink          SINK2      = sinkFor(700_000d, 800_000d);
+    final ResamplingSink          SINK3      = sinkFor(800_000d, 900_000d);
 
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
     assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;

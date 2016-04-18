@@ -36,7 +36,6 @@ import org.anhonesteffort.chnlzr.capnp.BaseMessageEncoder;
 import org.anhonesteffort.chnlzr.input.InputFactory;
 import org.anhonesteffort.chnlzr.input.SamplesSourceController;
 import org.anhonesteffort.chnlzr.netty.IdleStateHeartbeatWriter;
-import org.anhonesteffort.chnlzr.resample.RfChannelSinkFactory;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
@@ -49,11 +48,11 @@ public class ChnlzrServer {
   private final CriticalCallback criticalCallback = new CriticalCallback();
   private final ListeningExecutorService sourcePool = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
 
-  private final ChnlzrServerConfig      config;
-  private final TunableSamplesSource    source;
-  private final SamplesSourceController sourceController;
-  private final Disruptor<Samples>      disruptor;
-  private final RfChannelSinkFactory    resampling;
+  private final ChnlzrServerConfig           config;
+  private final TunableSamplesSource         source;
+  private final SamplesSourceController      sourceController;
+  private final Disruptor<Samples>           disruptor;
+  private final ResamplingNetworkSinkFactory resampling;
 
   public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
     this.config = config;
@@ -63,7 +62,7 @@ public class ChnlzrServer {
       source           = inputFactory.getSource().get();
       disruptor        = inputFactory.getDisruptor().get();
       sourceController = inputFactory.getSourceController().get();
-      resampling       = new RfChannelSinkFactory(config);
+      resampling       = new ResamplingNetworkSinkFactory(config);
     } else {
       throw new SamplesSourceException("no samples sources available");
     }

@@ -22,8 +22,7 @@ import io.netty.channel.ChannelHandlerContext;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.chnlzr.input.SamplesSourceController;
-import org.anhonesteffort.chnlzr.resample.RfChannelSink;
-import org.anhonesteffort.chnlzr.resample.RfChannelSinkFactory;
+import org.anhonesteffort.chnlzr.resample.ResamplingSink;
 import org.capnproto.MessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,17 +37,19 @@ public class ServerHandler extends ChannelHandlerAdapter {
   private static final Logger       log   = LoggerFactory.getLogger(ServerHandler.class);
   private final        ProtoFactory proto = new ProtoFactory();
 
-  private final int                     queueSize;
-  private final RfChannelSinkFactory    sinks;
-  private final SamplesSourceController source;
-  private final MessageBuilder          capabilities;
+  private final ResamplingNetworkSinkFactory sinks;
+  private final SamplesSourceController      source;
+  private final MessageBuilder               capabilities;
+  private final int                          queueSize;
 
   private Optional<ChannelAllocationRef> allocation = Optional.empty();
 
-  public ServerHandler(ChnlzrServerConfig config, RfChannelSinkFactory sinks, SamplesSourceController source) {
-    this.queueSize = config.clientWriteQueueSize();
+  public ServerHandler(
+      ChnlzrServerConfig config, ResamplingNetworkSinkFactory sinks, SamplesSourceController source
+  ) {
     this.sinks     = sinks;
     this.source    = source;
+    this.queueSize = config.clientWriteQueueSize();
     capabilities   = proto.capabilities(
         config.latitude(),     config.longitude(),
         config.polarization(), source.getCapabilities().getMinFreq(),
@@ -69,7 +70,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
     }
 
     WriteQueuingContext channelQueue = new WriteQueuingContext(context, queueSize);
-    RfChannelSink       channelSink  = sinks.create(channelQueue, request);
+    ResamplingSink      channelSink  = sinks.create(channelQueue, request);
     int                 error        = source.configureSourceForSink(channelSink);
 
     if (error == 0x00) {
@@ -122,10 +123,10 @@ public class ServerHandler extends ChannelHandlerAdapter {
   }
 
   private static class ChannelAllocationRef {
-    private final WriteQueuingContext  channelQueue;
-    private final RfChannelSink channelSink;
+    private final WriteQueuingContext channelQueue;
+    private final ResamplingSink      channelSink;
 
-    public ChannelAllocationRef(WriteQueuingContext channelQueue, RfChannelSink channelSink) {
+    public ChannelAllocationRef(WriteQueuingContext channelQueue, ResamplingSink channelSink) {
       this.channelQueue = channelQueue;
       this.channelSink  = channelSink;
     }
@@ -134,7 +135,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
       return channelQueue;
     }
 
-    public RfChannelSink getChannelSink() {
+    public ResamplingSink getChannelSink() {
       return channelSink;
     }
   }

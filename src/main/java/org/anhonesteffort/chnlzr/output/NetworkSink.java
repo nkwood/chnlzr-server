@@ -15,23 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr.resample;
+package org.anhonesteffort.chnlzr.output;
 
-import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
-import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
+import org.anhonesteffort.dsp.ComplexNumber;
+import org.anhonesteffort.dsp.DynamicSink;
 
-import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
-
-public class RfChannelSinkFactory {
-
-  private final int samplesPerMessage;
-
-  public RfChannelSinkFactory(ChnlzrServerConfig config) {
-    this.samplesPerMessage = config.samplesPerMessage();
-  }
-
-  public RfChannelSink create(WriteQueuingContext context, ChannelRequest.Reader request) {
-    return new ResamplingNetworkSink(context, request, samplesPerMessage);
-  }
+public interface NetworkSink extends DynamicSink<ComplexNumber> {
 
 }

@@ -17,7 +17,7 @@
 
 package org.anhonesteffort.chnlzr.input;
 
-import org.anhonesteffort.chnlzr.resample.RfChannelSink;
+import org.anhonesteffort.chnlzr.resample.ResamplingSink;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
@@ -34,11 +34,11 @@ public class SamplesSourceController {
 
   private static final Logger log = LoggerFactory.getLogger(SamplesSourceController.class);
 
-  private final Queue<RfChannelSink> sinks   = new ConcurrentLinkedQueue<>();
-  private final Object               txnLock = new Object();
-  private final TunableSamplesSource source;
-  private final Integer              maxSinks;
-  private final Double               dcOffsetHz;
+  private final Queue<ResamplingSink> sinks   = new ConcurrentLinkedQueue<>();
+  private final Object                txnLock = new Object();
+  private final TunableSamplesSource  source;
+  private final Integer               maxSinks;
+  private final Double                dcOffsetHz;
 
   public SamplesSourceController(TunableSamplesSource source, Integer maxSinks, Double dcOffsetHz) {
     this.source     = source;
@@ -126,7 +126,7 @@ public class SamplesSourceController {
                                   source.getMaxSampleRate());
   }
 
-  public int configureSourceForSink(RfChannelSink sink) {
+  public int configureSourceForSink(ResamplingSink sink) {
     synchronized (txnLock) {
 
       if (sinks.size() >= maxSinks) {
@@ -162,7 +162,7 @@ public class SamplesSourceController {
     return Error.ERROR_BANDWIDTH_UNAVAILABLE;
   }
 
-  public void releaseSink(RfChannelSink sink) {
+  public void releaseSink(ResamplingSink sink) {
     synchronized (txnLock) {
       source.removeSink(sink);
       sinks.remove(sink);
