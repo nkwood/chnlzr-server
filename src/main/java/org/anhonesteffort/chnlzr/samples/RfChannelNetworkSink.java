@@ -17,9 +17,9 @@
 
 package org.anhonesteffort.chnlzr.samples;
 
-import org.anhonesteffort.chnlzr.CapnpUtil;
+import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
-import org.anhonesteffort.chnlzr.WriteQueuingContext;
+import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.filter.ComplexNumberFrequencyTranslatingFilter;
@@ -34,13 +34,14 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
-import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
+import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage;
+import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
 public class RfChannelNetworkSink implements RfChannelSink {
 
   private static final Logger log = LoggerFactory.getLogger(RfChannelNetworkSink.class);
 
+  private final ProtoFactory        proto = new ProtoFactory();
   private final WriteQueuingContext writeQueue;
   private final ChannelSpec         spec;
   private final long                maxRateDiff;
@@ -56,7 +57,7 @@ public class RfChannelNetworkSink implements RfChannelSink {
                               ChannelRequest.Reader request)
   {
     this.writeQueue   = writeQueue;
-    spec              = CapnpUtil.spec(request);
+    spec              = proto.spec(request);
     maxRateDiff       = request.getMaxRateDiff();
     samplesPerMessage = config.samplesPerMessage();
     stateChange       = new AtomicReference<>();
@@ -65,7 +66,7 @@ public class RfChannelNetworkSink implements RfChannelSink {
   }
 
   private void initNextMessage() {
-    nextMessage = CapnpUtil.samples(samplesPerMessage);
+    nextMessage = proto.samples(samplesPerMessage);
     nextSamples = nextMessage.getRoot(BaseMessage.factory).getSamples().getSamples().asByteBuffer();
   }
 
@@ -91,7 +92,7 @@ public class RfChannelNetworkSink implements RfChannelSink {
     resampling.addSink(this::writeOrQueue);
 
     long channelRate = (long) (stateChange.sampleRate * resampling.getRateChange());
-    writeQueue.writeOrQueue(CapnpUtil.state(channelRate, 0d));
+    writeQueue.writeOrQueue(proto.state(channelRate, 0d));
 
     log.info(spec + " source rate " + stateChange.sampleRate + ", desired rate " + spec.getSampleRate() + ", channel rate " + channelRate);
     log.info(spec + " interpolation " + resampling.getInterpolation() + ", decimation " + resampling.getDecimation());

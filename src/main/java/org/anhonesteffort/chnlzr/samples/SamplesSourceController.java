@@ -27,7 +27,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static org.anhonesteffort.chnlzr.Proto.Error;
+import static org.anhonesteffort.chnlzr.capnp.Proto.Error;
 
 public class SamplesSourceController {
 

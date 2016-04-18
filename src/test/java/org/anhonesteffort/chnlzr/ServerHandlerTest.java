@@ -20,17 +20,19 @@ package org.anhonesteffort.chnlzr;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
+import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.capnproto.MessageBuilder;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
-import static org.anhonesteffort.chnlzr.Proto.Error;
-import static org.anhonesteffort.chnlzr.Proto.BaseMessage.Type;
+import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage;
+import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage.Type;
 
 public class ServerHandlerTest {
+
+  private static final ProtoFactory PROTO = new ProtoFactory();
 
   private static ChnlzrServerConfig config() {
     final ChnlzrServerConfig CONFIG = Mockito.mock(ChnlzrServerConfig.class);
@@ -44,13 +46,9 @@ public class ServerHandlerTest {
     return CONFIG;
   }
 
-  private static MessageBuilder request(double latitude,
-                                        double longitude,
-                                        double diff,
-                                        int    polarization)
-  {
-    return CapnpUtil.channelRequest(CapnpUtil.channelRequest(
-        latitude, longitude, diff, polarization, 1337, 9001, 48000, 150
+  private static MessageBuilder request() {
+    return PROTO.channelRequest(PROTO.channelRequest(
+        1337, 9001, 48000, 150
     ));
   }
 
@@ -70,120 +68,6 @@ public class ServerHandlerTest {
   }
 
   @Test
-  public void testRequestFailsLocationTooDistant() {
-    final ChnlzrServerConfig      CONFIG            = config();
-    final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
-    final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
-
-    Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
-
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
-    final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
-
-    assert CHANNEL.readOutbound() != null;
-
-    CHANNEL.writeInbound(
-        request(22.208335d, -159.507002d, 3800d, 1).getRoot(BaseMessage.factory).asReader()
-    );
-
-    final MessageBuilder     RECEIVED_MSG = CHANNEL.readOutbound();
-    final BaseMessage.Reader BASE_MSG     = RECEIVED_MSG.getRoot(BaseMessage.factory).asReader();
-
-    assert BASE_MSG.getType() == Type.ERROR;
-    assert BASE_MSG.getError().getCode() == Error.ERROR_INCAPABLE;
-
-    Mockito.verify(SOURCE_CONTROLLER, Mockito.never()).configureSourceForSink(Mockito.any());
-  }
-
-  @Test
-  public void testRequestFailsPolarizationDifferent() {
-    final ChnlzrServerConfig      CONFIG            = config();
-    final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
-    final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
-
-    Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
-
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
-    final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
-
-    assert CHANNEL.readOutbound() != null;
-
-    CHANNEL.writeInbound(
-        request(22.208335d, -159.507002d, 0d, 2).getRoot(BaseMessage.factory).asReader()
-    );
-
-    final MessageBuilder     RECEIVED_MSG = CHANNEL.readOutbound();
-    final BaseMessage.Reader BASE_MSG     = RECEIVED_MSG.getRoot(BaseMessage.factory).asReader();
-
-    assert BASE_MSG.getType() == Type.ERROR;
-    assert BASE_MSG.getError().getCode() == Error.ERROR_INCAPABLE;
-
-    Mockito.verify(SOURCE_CONTROLLER, Mockito.never()).configureSourceForSink(Mockito.any());
-  }
-
-  @Test
-  public void testRequestSucceedsPolarizationIndifferent() {
-    final ChnlzrServerConfig      CONFIG            = config();
-    final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
-    final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
-
-    Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
-
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
-    final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
-
-    assert CHANNEL.readOutbound() != null;
-
-    CHANNEL.writeInbound(
-        request(22.208335d, -159.507002d, 0d, 0).getRoot(BaseMessage.factory).asReader()
-    );
-
-    Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-  }
-
-  @Test
-  public void testRequestSucceedsLocationIndifferent() {
-    final ChnlzrServerConfig      CONFIG            = config();
-    final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
-    final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
-
-    Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
-    Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
-
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
-    final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
-
-    assert CHANNEL.readOutbound() != null;
-
-    CHANNEL.writeInbound(
-        request(1337d, 9001d, 0d, 1).getRoot(BaseMessage.factory).asReader()
-    );
-
-    Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-  }
-
-  @Test
-  public void testRequestSucceedsLocationSpecific() {
-    final ChnlzrServerConfig      CONFIG            = config();
-    final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
-    final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
-
-    Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
-    Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
-
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
-    final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
-
-    assert CHANNEL.readOutbound() != null;
-
-    CHANNEL.writeInbound(
-        request(22.208335d, -159.507002d, 4000d, 1).getRoot(BaseMessage.factory).asReader()
-    );
-
-    Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
-  }
-
-  @Test
   public void testRequestResourcesReleasedOnClose() throws Exception {
     final ChnlzrServerConfig      CONFIG            = config();
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
@@ -197,9 +81,7 @@ public class ServerHandlerTest {
 
     assert CHANNEL.readOutbound() != null;
 
-    CHANNEL.writeInbound(
-        request(1337d, 9001d, 0d, 1).getRoot(BaseMessage.factory).asReader()
-    );
+    CHANNEL.writeInbound(request().getRoot(BaseMessage.factory).asReader());
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
     Mockito.verify(SOURCE_CONTROLLER, Mockito.never()).releaseSink(Mockito.any());
@@ -223,14 +105,12 @@ public class ServerHandlerTest {
 
     assert CHANNEL.readOutbound() != null;
 
-    CHANNEL.writeInbound(
-        request(1337d, 9001d, 0d, 1).getRoot(BaseMessage.factory).asReader()
-    );
+    CHANNEL.writeInbound(request().getRoot(BaseMessage.factory).asReader());
 
     Mockito.verify(SOURCE_CONTROLLER, Mockito.times(1)).configureSourceForSink(Mockito.any());
 
     final ChannelHandlerContext CONTEXT = Mockito.mock(ChannelHandlerContext.class);
-    HANDLER.channelRead(CONTEXT, request(1337d, 9001d, 0d, 1).getRoot(BaseMessage.factory).asReader());
+    HANDLER.channelRead(CONTEXT, request().getRoot(BaseMessage.factory).asReader());
 
     Mockito.verify(CONTEXT, Mockito.times(1)).close();
   }

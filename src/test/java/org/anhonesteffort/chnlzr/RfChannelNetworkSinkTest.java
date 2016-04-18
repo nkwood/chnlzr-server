@@ -20,6 +20,8 @@ package org.anhonesteffort.chnlzr;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
+import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
 import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;
@@ -28,21 +30,21 @@ import org.mockito.Mockito;
 
 import java.util.stream.IntStream;
 
-import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
+import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
 public class RfChannelNetworkSinkTest {
 
+  private static final ProtoFactory PROTO = new ProtoFactory();
+
   private ChnlzrServerConfig config() {
     final ChnlzrServerConfig CONFIG = Mockito.mock(ChnlzrServerConfig.class);
-
     Mockito.when(CONFIG.samplesPerMessage()).thenReturn(10000);
-
     return CONFIG;
   }
 
   private static ChannelRequest.Reader request(long sampleRate) {
-    return CapnpUtil.channelRequest(
-        0d, 0d, 0d, 1, 9001d, 1337d, sampleRate, 150
+    return PROTO.channelRequest(
+        9001d, 1337d, sampleRate, 150
     );
   }
 

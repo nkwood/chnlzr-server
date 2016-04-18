@@ -19,6 +19,8 @@ package org.anhonesteffort.chnlzr;
 
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
+import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
 import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.capnproto.MessageBuilder;
@@ -27,14 +29,14 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
-import static org.anhonesteffort.chnlzr.Proto.BaseMessage;
-import static org.anhonesteffort.chnlzr.Proto.ChannelRequest;
-import static org.anhonesteffort.chnlzr.Proto.Error;
+import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage;
+import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
 public class ServerHandler extends ChannelHandlerAdapter {
 
   private static final Logger log = LoggerFactory.getLogger(ServerHandler.class);
 
+  private final ProtoFactory            proto = new ProtoFactory();
   private final ChnlzrServerConfig      config;
   private final SamplesSourceController sourceController;
   private final MessageBuilder          capabilities;
@@ -44,9 +46,11 @@ public class ServerHandler extends ChannelHandlerAdapter {
   public ServerHandler(ChnlzrServerConfig config, SamplesSourceController sourceController) {
     this.config           = config;
     this.sourceController = sourceController;
-    capabilities          = CapnpUtil.capabilities(
+    capabilities          = proto.capabilities(
         config.latitude(),     config.longitude(),
-        config.polarization(), sourceController.getCapabilities()
+        config.polarization(), sourceController.getCapabilities().getMinFreq(),
+        sourceController.getCapabilities().getMaxFreq(),
+        sourceController.getCapabilities().getSampleRate()
     );
   }
 
@@ -62,33 +66,15 @@ public class ServerHandler extends ChannelHandlerAdapter {
       return;
     }
 
-    if (request.getMaxLocationDiff() > 0d) {
-      double locationDiffKm = Util.kmDistanceBetween(
-          request.getLatitude(), request.getLongitude(), config.latitude(), config.longitude()
-      );
-
-      if (locationDiffKm > request.getMaxLocationDiff()) {
-        context.writeAndFlush(CapnpUtil.error(Error.ERROR_INCAPABLE));
-        return;
-      }
-    }
-
-    if (request.getPolarization() != 0 &&
-        request.getPolarization() != config.polarization())
-    {
-      context.writeAndFlush(CapnpUtil.error(Error.ERROR_INCAPABLE));
-      return;
-    }
-
     WriteQueuingContext  channelQueue = new WriteQueuingContext(context, config.clientWriteQueueSize());
     RfChannelNetworkSink channelSink  = new RfChannelNetworkSink(config, channelQueue, request);
     int                  error        = sourceController.configureSourceForSink(channelSink);
 
     if (error == 0x00) {
       allocation = Optional.of(new ChannelAllocationRef(channelQueue, channelSink));
-      log.info(CapnpUtil.spec(request) + " channel sink started");
+      log.info(proto.spec(request) + " channel sink started");
     } else {
-      context.writeAndFlush(CapnpUtil.error(error));
+      context.writeAndFlush(proto.error(error));
     }
   }
 

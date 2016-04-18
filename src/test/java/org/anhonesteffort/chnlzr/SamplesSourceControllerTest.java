@@ -32,7 +32,7 @@ import org.junit.Test;
 
 import java.util.Optional;
 
-import static org.anhonesteffort.chnlzr.Proto.Error;
+import static org.anhonesteffort.chnlzr.capnp.Proto.Error;
 
 public class SamplesSourceControllerTest {
 
