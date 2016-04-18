@@ -22,6 +22,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.input.SamplesSourceController;
+import org.anhonesteffort.chnlzr.resample.RfChannelSink;
+import org.anhonesteffort.chnlzr.resample.RfChannelSinkFactory;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.capnproto.MessageBuilder;
 import org.junit.Test;
@@ -55,12 +57,13 @@ public class ServerHandlerTest {
   @Test
   public void testCapabilitiesSentFirst() {
     final ChnlzrServerConfig      CONFIG            = config();
+    final RfChannelSinkFactory    SINK_FACTORY      = Mockito.mock(RfChannelSinkFactory.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
 
-    final ChannelHandler  HANDLER      = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
+    final ChannelHandler  HANDLER      = new ServerHandler(CONFIG, SINK_FACTORY, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL      = new EmbeddedChannel(HANDLER);
     final MessageBuilder  RECEIVED_MSG = CHANNEL.readOutbound();
 
@@ -70,13 +73,18 @@ public class ServerHandlerTest {
   @Test
   public void testRequestResourcesReleasedOnClose() throws Exception {
     final ChnlzrServerConfig      CONFIG            = config();
+    final RfChannelSinkFactory    SINK_FACTORY      = Mockito.mock(RfChannelSinkFactory.class);
+    final RfChannelSink           SINK              = Mockito.mock(RfChannelSink.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
     Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
+    Mockito.when(SINK.getChannelSpec()).thenReturn(new ChannelSpec(1337d, 9001d));
+    Mockito.when(SINK_FACTORY.create(Mockito.any(), Mockito.any())).thenReturn(SINK);
+
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SINK_FACTORY, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;
@@ -94,13 +102,18 @@ public class ServerHandlerTest {
   @Test
   public void testContextClosedOnChannelRequestAfterChannelAllocation() throws Exception {
     final ChnlzrServerConfig      CONFIG            = config();
+    final RfChannelSinkFactory    SINK_FACTORY      = Mockito.mock(RfChannelSinkFactory.class);
+    final RfChannelSink           SINK              = Mockito.mock(RfChannelSink.class);
     final SamplesSourceController SOURCE_CONTROLLER = Mockito.mock(SamplesSourceController.class);
     final ChannelSpec             SPEC              = ChannelSpec.fromMinMax(1337d, 9001d);
 
     Mockito.when(SOURCE_CONTROLLER.getCapabilities()).thenReturn(SPEC);
     Mockito.when(SOURCE_CONTROLLER.configureSourceForSink(Mockito.any())).thenReturn(0x00);
 
-    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SOURCE_CONTROLLER);
+    Mockito.when(SINK.getChannelSpec()).thenReturn(new ChannelSpec(1337d, 9001d));
+    Mockito.when(SINK_FACTORY.create(Mockito.any(), Mockito.any())).thenReturn(SINK);
+
+    final ChannelHandler  HANDLER = new ServerHandler(CONFIG, SINK_FACTORY, SOURCE_CONTROLLER);
     final EmbeddedChannel CHANNEL = new EmbeddedChannel(HANDLER);
 
     assert CHANNEL.readOutbound() != null;

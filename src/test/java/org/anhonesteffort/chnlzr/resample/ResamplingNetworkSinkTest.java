@@ -69,7 +69,7 @@ public class ResamplingNetworkSinkTest {
     Mockito.when(CONTEXT.channel()).thenReturn(CHANNEL);
 
     final WriteQueuingContext   QUEUE = new WriteQueuingContext(CONTEXT, 16);
-    final ResamplingNetworkSink SINK  = new ResamplingNetworkSink(CONFIG, QUEUE, REQUEST);
+    final ResamplingNetworkSink SINK  = new ResamplingNetworkSink(QUEUE, REQUEST, CONFIG.samplesPerMessage());
 
     SINK.onSourceStateChange(SOURCE_RATE, 9001d);
     SINK.consume(SAMPLES);

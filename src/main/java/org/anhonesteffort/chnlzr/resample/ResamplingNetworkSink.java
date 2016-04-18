@@ -18,7 +18,6 @@
 package org.anhonesteffort.chnlzr.resample;
 
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
-import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
@@ -41,26 +40,25 @@ public class ResamplingNetworkSink implements RfChannelSink {
 
   private static final Logger log = LoggerFactory.getLogger(ResamplingNetworkSink.class);
 
-  private final ProtoFactory        proto = new ProtoFactory();
+  private final ProtoFactory                 proto       = new ProtoFactory();
+  private final AtomicReference<StateChange> stateChange = new AtomicReference<>(null);
+
   private final WriteQueuingContext writeQueue;
   private final ChannelSpec         spec;
   private final long                maxRateDiff;
   private final int                 samplesPerMessage;
 
-  private AtomicReference<StateChange> stateChange;
-  private Filter<ComplexNumber>        freqTranslation;
-  private MessageBuilder               nextMessage;
-  private ByteBuffer                   nextSamples;
+  private Filter<ComplexNumber> freqTranslation;
+  private MessageBuilder        nextMessage;
+  private ByteBuffer            nextSamples;
 
-  public ResamplingNetworkSink(ChnlzrServerConfig    config,
-                               WriteQueuingContext   writeQueue,
-                               ChannelRequest.Reader request)
-  {
-    this.writeQueue   = writeQueue;
-    spec              = proto.spec(request);
-    maxRateDiff       = request.getMaxRateDiff();
-    samplesPerMessage = config.samplesPerMessage();
-    stateChange       = new AtomicReference<>();
+  public ResamplingNetworkSink(
+      WriteQueuingContext writeQueue, ChannelRequest.Reader request, int samplesPerMessage
+  ) {
+    this.writeQueue        = writeQueue;
+    spec                   = proto.spec(request);
+    maxRateDiff            = request.getMaxRateDiff();
+    this.samplesPerMessage = samplesPerMessage;
 
     initNextMessage();
   }
@@ -110,9 +108,10 @@ public class ResamplingNetworkSink implements RfChannelSink {
 
   @Override
   public void consume(Samples samples) {
-    StateChange change = stateChange.getAndSet(null);
+    StateChange change = stateChange.get();
 
     if (change != null) {
+      stateChange.lazySet(null);
       onSourceStateChange(change);
     }
 
