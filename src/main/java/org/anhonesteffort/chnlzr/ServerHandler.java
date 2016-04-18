@@ -21,8 +21,8 @@ import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
-import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
-import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
+import org.anhonesteffort.chnlzr.resample.ResamplingNetworkSink;
+import org.anhonesteffort.chnlzr.input.SamplesSourceController;
 import org.capnproto.MessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,9 +66,9 @@ public class ServerHandler extends ChannelHandlerAdapter {
       return;
     }
 
-    WriteQueuingContext  channelQueue = new WriteQueuingContext(context, config.clientWriteQueueSize());
-    RfChannelNetworkSink channelSink  = new RfChannelNetworkSink(config, channelQueue, request);
-    int                  error        = sourceController.configureSourceForSink(channelSink);
+    WriteQueuingContext   channelQueue = new WriteQueuingContext(context, config.clientWriteQueueSize());
+    ResamplingNetworkSink channelSink  = new ResamplingNetworkSink(config, channelQueue, request);
+    int                   error        = sourceController.configureSourceForSink(channelSink);
 
     if (error == 0x00) {
       allocation = Optional.of(new ChannelAllocationRef(channelQueue, channelSink));
@@ -121,9 +121,9 @@ public class ServerHandler extends ChannelHandlerAdapter {
 
   private static class ChannelAllocationRef {
     private final WriteQueuingContext  channelQueue;
-    private final RfChannelNetworkSink channelSink;
+    private final ResamplingNetworkSink channelSink;
 
-    public ChannelAllocationRef(WriteQueuingContext channelQueue, RfChannelNetworkSink channelSink) {
+    public ChannelAllocationRef(WriteQueuingContext channelQueue, ResamplingNetworkSink channelSink) {
       this.channelQueue = channelQueue;
       this.channelSink  = channelSink;
     }
@@ -132,7 +132,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
       return channelQueue;
     }
 
-    public RfChannelNetworkSink getChannelSink() {
+    public ResamplingNetworkSink getChannelSink() {
       return channelSink;
     }
   }

@@ -17,13 +17,10 @@
 
 package org.anhonesteffort.chnlzr;
 
-import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -36,56 +33,50 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.anhonesteffort.chnlzr.capnp.BaseMessageDecoder;
 import org.anhonesteffort.chnlzr.capnp.BaseMessageEncoder;
+import org.anhonesteffort.chnlzr.input.InputFactory;
+import org.anhonesteffort.chnlzr.input.SamplesSourceController;
 import org.anhonesteffort.chnlzr.netty.IdleStateHeartbeatWriter;
-import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
-import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ChnlzrServer {
 
-  private static final Logger log = LoggerFactory.getLogger(ChnlzrServer.class);
+  private final CriticalCallback criticalCallback = new CriticalCallback();
   private final ListeningExecutorService sourcePool = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
 
-  private final ChnlzrServerConfig   config;
-  private final TunableSamplesSource source;
-  private final Disruptor<Samples>   disruptor;
-  private final ServerHandlerFactory handlers;
+  private final ChnlzrServerConfig      config;
+  private final TunableSamplesSource    source;
+  private final SamplesSourceController sourceController;
+  private final Disruptor<Samples>      disruptor;
 
   public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
     this.config = config;
+    InputFactory inputFactory = new InputFactory(config);
 
-    TunableSamplesSourceFactory    sourceFactory = new TunableSamplesSourceFactory(new BlockingWaitStrategy(), config.ringBufferSize(), config.sourceCpuAffinity(), config.cicPoolSize());
-    Optional<TunableSamplesSource> source        = sourceFactory.getSource();
-
-    if (source.isPresent()) {
-      SamplesSourceController sourceController = new SamplesSourceController(
-          source.get(), config.cicPoolSize(), config.dcOffset()
-      );
-
-      this.source    = source.get();
-      this.disruptor = sourceFactory.getDisruptor();
-      handlers       = new ServerHandlerFactory(config, sourceController);
+    if (inputFactory.getSource().isPresent()) {
+      source           = inputFactory.getSource().get();
+      disruptor        = inputFactory.getDisruptor().get();
+      sourceController = inputFactory.getSourceController().get();
     } else {
       throw new SamplesSourceException("no samples sources available");
     }
   }
 
-  public void run() throws InterruptedException {
-    disruptor.setDefaultExceptionHandler(new DisruptorExceptionHandler());
+  @SuppressWarnings("unchecked")
+  private void run() throws InterruptedException {
+    disruptor.setDefaultExceptionHandler(criticalCallback);
     disruptor.start();
 
     ListenableFuture sourceFuture = sourcePool.submit(source);
-    EventLoopGroup   bossGroup    = new NioEventLoopGroup();
-    EventLoopGroup   workerGroup  = new NioEventLoopGroup();
-    ServerBootstrap  bootstrap    = new ServerBootstrap();
+    Futures.addCallback(sourceFuture, criticalCallback);
+
+    EventLoopGroup  bossGroup   = new NioEventLoopGroup();
+    EventLoopGroup  workerGroup = new NioEventLoopGroup();
+    ServerBootstrap bootstrap   = new ServerBootstrap();
 
     try {
 
@@ -103,12 +94,11 @@ public class ChnlzrServer {
                    ch.pipeline().addLast("heartbeat",  IdleStateHeartbeatWriter.INSTANCE);
                    ch.pipeline().addLast("encoder",    BaseMessageEncoder.INSTANCE);
                    ch.pipeline().addLast("decoder",    new BaseMessageDecoder());
-                   ch.pipeline().addLast("handler",    handlers.create());
+                   ch.pipeline().addLast("handler",    new ServerHandler(config, sourceController));
                  }
                });
 
       ChannelFuture channelFuture = bootstrap.bind(config.serverPort()).sync();
-      Futures.addCallback(sourceFuture, new SourceStoppedCallback());
       channelFuture.channel().closeFuture().sync();
 
     } finally {
@@ -120,40 +110,6 @@ public class ChnlzrServer {
     }
 
     System.exit(1);
-  }
-
-  private static class SourceStoppedCallback implements FutureCallback<Void> {
-    @Override
-    public void onSuccess(Void nothing) {
-      log.error("samples source stopped unexpectedly");
-      System.exit(1);
-    }
-
-    @Override
-    public void onFailure(Throwable throwable) {
-      log.error("samples source stopped unexpectedly", throwable);
-      System.exit(1);
-    }
-  }
-
-  private static class DisruptorExceptionHandler implements ExceptionHandler<Samples> {
-    @Override
-    public void handleEventException(Throwable throwable, long l, Samples samples) {
-      log.error("disruptor error", throwable);
-      System.exit(1);
-    }
-
-    @Override
-    public void handleOnStartException(Throwable throwable) {
-      log.error("disruptor error", throwable);
-      System.exit(1);
-    }
-
-    @Override
-    public void handleOnShutdownException(Throwable throwable) {
-      log.error("disruptor error", throwable);
-      System.exit(1);
-    }
   }
 
   public static void main(String[] args) throws Exception {

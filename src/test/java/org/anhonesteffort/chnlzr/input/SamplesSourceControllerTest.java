@@ -15,12 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr;
+package org.anhonesteffort.chnlzr.input;
 
 import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
-import org.anhonesteffort.chnlzr.samples.RfChannelSink;
-import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
+import org.anhonesteffort.chnlzr.resample.RfChannelSink;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;

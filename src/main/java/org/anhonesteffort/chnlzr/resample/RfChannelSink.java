@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr.samples;
+package org.anhonesteffort.chnlzr.resample;
 
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.DynamicSink;

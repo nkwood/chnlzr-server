@@ -15,8 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr.samples;
+package org.anhonesteffort.chnlzr.input;
 
+import org.anhonesteffort.chnlzr.resample.RfChannelSink;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.anhonesteffort.dsp.sample.SamplesSourceException;
 import org.anhonesteffort.dsp.sample.TunableSamplesSource;
@@ -46,8 +47,9 @@ public class SamplesSourceController {
   }
 
   private Optional<Double> getMinChannelFrequency() {
-    if (sinks.isEmpty())
+    if (sinks.isEmpty()) {
       return Optional.empty();
+    }
 
     return Optional.of(sinks.stream()
                             .mapToDouble(sink -> sink.getChannelSpec().getMinFreq())
@@ -56,8 +58,9 @@ public class SamplesSourceController {
   }
 
   private Optional<Double> getMaxChannelFrequency() {
-    if (sinks.isEmpty())
+    if (sinks.isEmpty()) {
       return Optional.empty();
+    }
 
     return Optional.of(sinks.stream()
                             .mapToDouble(sink -> sink.getChannelSpec().getMaxFreq())
@@ -66,8 +69,9 @@ public class SamplesSourceController {
   }
 
   private Optional<Long> getMaxChannelSampleRate() {
-    if (sinks.isEmpty())
+    if (sinks.isEmpty()) {
       return Optional.empty();
+    }
 
     return Optional.of(sinks.stream()
                             .mapToLong(sink -> sink.getChannelSpec().getSampleRate())
@@ -101,17 +105,19 @@ public class SamplesSourceController {
   }
 
   private boolean isTunable(ChannelSpec spec) {
-    if (sinks.isEmpty())
+    if (sinks.isEmpty()) {
       return source.isTunable(accommodateDcOffset(spec));
-
-    return source.isTunable(getIdealChannelSpec(spec));
+    } else {
+      return source.isTunable(getIdealChannelSpec(spec));
+    }
   }
 
   private void handleTuneToFitNewChannel(ChannelSpec newChannel) throws SamplesSourceException {
-    if (sinks.isEmpty())
+    if (sinks.isEmpty()) {
       source.tune(accommodateDcOffset(newChannel));
-    else
+    } else {
       source.tune(getIdealChannelSpec(newChannel));
+    }
   }
 
   public ChannelSpec getCapabilities() {
@@ -130,8 +136,9 @@ public class SamplesSourceController {
       ChannelSpec requestedChannel = sink.getChannelSpec();
       ChannelSpec tunedChannel     = source.getTunedChannel();
 
-      if (!source.isTunable(accommodateDcOffset(requestedChannel)))
+      if (!source.isTunable(accommodateDcOffset(requestedChannel))) {
         return Error.ERROR_INCAPABLE;
+      }
 
       if (!sinks.isEmpty() && tunedChannel.containsChannel(requestedChannel)) {
         source.addSink(sink);

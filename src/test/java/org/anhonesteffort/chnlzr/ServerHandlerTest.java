@@ -21,7 +21,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
-import org.anhonesteffort.chnlzr.samples.SamplesSourceController;
+import org.anhonesteffort.chnlzr.input.SamplesSourceController;
 import org.anhonesteffort.dsp.ChannelSpec;
 import org.capnproto.MessageBuilder;
 import org.junit.Test;

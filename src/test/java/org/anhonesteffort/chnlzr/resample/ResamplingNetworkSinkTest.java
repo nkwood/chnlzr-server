@@ -15,14 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr;
+package org.anhonesteffort.chnlzr.resample;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
-import org.anhonesteffort.chnlzr.samples.RfChannelNetworkSink;
 import org.anhonesteffort.dsp.ComplexNumber;
 import org.anhonesteffort.dsp.sample.Samples;
 import org.junit.Test;
@@ -32,7 +32,7 @@ import java.util.stream.IntStream;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
-public class RfChannelNetworkSinkTest {
+public class ResamplingNetworkSinkTest {
 
   private static final ProtoFactory PROTO = new ProtoFactory();
 
@@ -68,8 +68,8 @@ public class RfChannelNetworkSinkTest {
     Mockito.when(CHANNEL.isWritable()).thenReturn(true);
     Mockito.when(CONTEXT.channel()).thenReturn(CHANNEL);
 
-    final WriteQueuingContext  QUEUE = new WriteQueuingContext(CONTEXT, 16);
-    final RfChannelNetworkSink SINK  = new RfChannelNetworkSink(CONFIG, QUEUE, REQUEST);
+    final WriteQueuingContext   QUEUE = new WriteQueuingContext(CONTEXT, 16);
+    final ResamplingNetworkSink SINK  = new ResamplingNetworkSink(CONFIG, QUEUE, REQUEST);
 
     SINK.onSourceStateChange(SOURCE_RATE, 9001d);
     SINK.consume(SAMPLES);

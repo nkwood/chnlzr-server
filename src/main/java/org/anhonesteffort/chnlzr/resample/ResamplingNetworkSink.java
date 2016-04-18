@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr.samples;
+package org.anhonesteffort.chnlzr.resample;
 
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
@@ -37,9 +37,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage;
 import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
-public class RfChannelNetworkSink implements RfChannelSink {
+public class ResamplingNetworkSink implements RfChannelSink {
 
-  private static final Logger log = LoggerFactory.getLogger(RfChannelNetworkSink.class);
+  private static final Logger log = LoggerFactory.getLogger(ResamplingNetworkSink.class);
 
   private final ProtoFactory        proto = new ProtoFactory();
   private final WriteQueuingContext writeQueue;
@@ -52,9 +52,9 @@ public class RfChannelNetworkSink implements RfChannelSink {
   private MessageBuilder               nextMessage;
   private ByteBuffer                   nextSamples;
 
-  public RfChannelNetworkSink(ChnlzrServerConfig    config,
-                              WriteQueuingContext   writeQueue,
-                              ChannelRequest.Reader request)
+  public ResamplingNetworkSink(ChnlzrServerConfig    config,
+                               WriteQueuingContext   writeQueue,
+                               ChannelRequest.Reader request)
   {
     this.writeQueue   = writeQueue;
     spec              = proto.spec(request);
