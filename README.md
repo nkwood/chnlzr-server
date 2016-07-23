@@ -7,7 +7,7 @@ Resample RF spectrum and stream it over network.
 # useradd -m chnlzr
 # su chnlzr
 $ cd /home/chnlzr
-$ git clone https://github.com/rhodey/chnlzr-server
+$ git clone https://github.com/radiowitness/chnlzr-server
 $ cd chnlzr-server
 $ mvn package
 ```
