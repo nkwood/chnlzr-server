@@ -1,6 +1,6 @@
 # chnlzr
 
-Resample RF spectrum and stream it over network.
+Resample radio frequency spectrum and stream it over TCP.
 
 ## Setup
 ```
@@ -13,14 +13,14 @@ $ mvn package
 ```
 
 ## Chose a sample source
-chnlzr uses the Java SPI pattern to allow for modular software defined
+chnlzr-server uses the Java SPI pattern to allow for modular software defined
 radio support. To add support for your SDR extend `org.anhonesteffort.dsp.sample.TunableSamplesSource`
 and implement `org.anhonesteffort.dsp.sample.TunableSamplesSourceProvider`
 then compile to a .jar and copy it to `import/`.
 
 Currently the following drivers are available:
-  + Mock Sample Source - [dsp-mock-source](https://github.com/rhodey/dsp-mock-source)
-  + Ettus USRP SDRs - [dsp-usrp-source](https://github.com/rhodey/dsp-usrp-source)
+  + Mock Sample Source - [dsp-mock-source](https://github.com/radiowitness/dsp-mock-source)
+  + Ettus USRP SDRs - [dsp-usrp-source](https://github.com/radiowitness/dsp-usrp-source)
 
 ## Configure
 ```
