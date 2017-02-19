@@ -1,0 +1,13 @@
+[Unit]
+Description=Tries to keep an instance of chnlzr-server alive
+After=network-online.target
+
+[Service]
+User=chnlzr
+WorkingDirectory=/home/chnlzr/chnlzr-server
+ExecStart=/bin/sh -c '/home/chnlzr/chnlzr-server/run-info.sh >> /tmp/chnlzr.log 2>&1'
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

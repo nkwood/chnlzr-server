@@ -1,5 +1,4 @@
-# chnlzr
-
+# chnlzr-server
 Resample radio frequency spectrum and stream it over TCP.
 
 ## Setup
@@ -34,12 +33,11 @@ $ ./run-debug.sh
 
 ## Install
 ```
-# cp chnlzr.conf /etc/init/chnlzr.conf
-# start chnlzr
+# cp chnlzr.service /etc/systemd/system/chnlzr.service
+# systemctl enable chnlzr.service
+# service chnlzr start
 ```
 
 ## License
-
 Copyright 2016 An Honest Effort LLC
-
 Licensed under the GPLv3: http://www.gnu.org/licenses/gpl-3.0.html
