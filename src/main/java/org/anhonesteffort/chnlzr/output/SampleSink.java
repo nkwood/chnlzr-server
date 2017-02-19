@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,14 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr.resample;
+package org.anhonesteffort.chnlzr.output;
 
-import org.anhonesteffort.dsp.ChannelSpec;
-import org.anhonesteffort.dsp.DynamicSink;
-import org.anhonesteffort.dsp.sample.Samples;
+import org.anhonesteffort.dsp.StatefulSink;
+import org.anhonesteffort.dsp.util.ComplexNumber;
 
-public interface ResamplingSink extends DynamicSink<Samples> {
-
-  public ChannelSpec getChannelSpec();
+public interface SampleSink extends StatefulSink<ComplexNumber> {
 
 }

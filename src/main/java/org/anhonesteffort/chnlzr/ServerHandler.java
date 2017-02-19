@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +17,13 @@
 
 package org.anhonesteffort.chnlzr;
 
-import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
 import org.anhonesteffort.chnlzr.input.SamplesSourceController;
-import org.anhonesteffort.chnlzr.resample.ResamplingSink;
+import org.anhonesteffort.chnlzr.resample.SamplesSink;
+import org.anhonesteffort.chnlzr.resample.SamplesSinkFactory;
 import org.capnproto.MessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,20 +33,20 @@ import java.util.Optional;
 import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage;
 import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
-public class ServerHandler extends ChannelHandlerAdapter {
+public class ServerHandler extends ChannelInboundHandlerAdapter {
 
   private static final Logger       log   = LoggerFactory.getLogger(ServerHandler.class);
   private final        ProtoFactory proto = new ProtoFactory();
 
-  private final ResamplingNetworkSinkFactory sinks;
-  private final SamplesSourceController      source;
-  private final MessageBuilder               capabilities;
-  private final int                          queueSize;
+  private final SamplesSinkFactory      sinks;
+  private final SamplesSourceController source;
+  private final MessageBuilder          capabilities;
+  private final int                     queueSize;
 
   private Optional<ChannelAllocationRef> allocation = Optional.empty();
 
   public ServerHandler(
-      ChnlzrServerConfig config, ResamplingNetworkSinkFactory sinks, SamplesSourceController source
+      ChnlzrServerConfig config, SamplesSinkFactory sinks, SamplesSourceController source
   ) {
     this.sinks     = sinks;
     this.source    = source;
@@ -70,7 +71,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
     }
 
     WriteQueuingContext channelQueue = new WriteQueuingContext(context, queueSize);
-    ResamplingSink      channelSink  = sinks.create(channelQueue, request);
+    SamplesSink         channelSink  = sinks.create(channelQueue, request);
     int                 error        = source.configureSourceForSink(channelSink);
 
     if (error == 0x00) {
@@ -98,15 +99,15 @@ public class ServerHandler extends ChannelHandlerAdapter {
 
   @Override
   public void channelWritabilityChanged(ChannelHandlerContext context) {
-    if (allocation.isPresent()) {
-      allocation.get().getChannelQueue().onWritabilityChanged();
-    }
+    allocation.ifPresent(alloc ->
+        alloc.getChannelQueue().onWritabilityChanged()
+    );
   }
 
   @Override
   public void exceptionCaught(ChannelHandlerContext context, Throwable cause) {
     if (allocation.isPresent()) {
-      log.error(allocation.get().getChannelSink().getChannelSpec() + " caught unexpected exception, closing", cause);
+      log.error(allocation.get().getChannelSink().getSpec() + " caught unexpected exception, closing", cause);
     } else {
       log.error("caught unexpected exception, closing", cause);
     }
@@ -117,16 +118,16 @@ public class ServerHandler extends ChannelHandlerAdapter {
   public void channelInactive(ChannelHandlerContext context) {
     if (allocation.isPresent()) {
       source.releaseSink(allocation.get().getChannelSink());
-      log.info(allocation.get().getChannelSink().getChannelSpec() + " channel sink stopped");
+      log.info(allocation.get().getChannelSink().getSpec() + " channel sink stopped");
       allocation = Optional.empty();
     }
   }
 
   private static class ChannelAllocationRef {
     private final WriteQueuingContext channelQueue;
-    private final ResamplingSink      channelSink;
+    private final SamplesSink channelSink;
 
-    public ChannelAllocationRef(WriteQueuingContext channelQueue, ResamplingSink channelSink) {
+    public ChannelAllocationRef(WriteQueuingContext channelQueue, SamplesSink channelSink) {
       this.channelQueue = channelQueue;
       this.channelSink  = channelSink;
     }
@@ -135,7 +136,7 @@ public class ServerHandler extends ChannelHandlerAdapter {
       return channelQueue;
     }
 
-    public ResamplingSink getChannelSink() {
+    public SamplesSink getChannelSink() {
       return channelSink;
     }
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 package org.anhonesteffort.chnlzr.resample;
 
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
-import org.anhonesteffort.dsp.ComplexNumber;
-import org.anhonesteffort.dsp.DynamicSink;
+import org.anhonesteffort.chnlzr.output.SampleSink;
 import org.anhonesteffort.dsp.sample.Samples;
+import org.anhonesteffort.dsp.util.ComplexNumber;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -28,13 +28,13 @@ import java.util.stream.IntStream;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
-public class RfResamplingSinkTest {
+public class ResamplingSamplesSinkTest {
 
   private static final ProtoFactory PROTO = new ProtoFactory();
 
   private static ChannelRequest.Reader request(long sampleRate) {
     return PROTO.channelRequest(
-        9001d, 1337d, sampleRate, 150
+        9001d, 1337d, sampleRate, 150l
     );
   }
 
@@ -50,15 +50,15 @@ public class RfResamplingSinkTest {
         SAMPLES.getSamples()[i] = new ComplexNumber(0f, 0f)
     );
 
-    final DynamicSink<ComplexNumber> NEXT_SINK = Mockito.mock(DynamicSink.class);
-    final RfResamplingSink           SINK      = new RfResamplingSink(REQUEST, NEXT_SINK);
+    final SampleSink            NEXT_SINK = Mockito.mock(SampleSink.class);
+    final ResamplingSamplesSink SINK      = new ResamplingSamplesSink(REQUEST, NEXT_SINK);
 
-    Mockito.verify(NEXT_SINK, Mockito.never()).onSourceStateChange(Mockito.any(), Mockito.any());
+    Mockito.verify(NEXT_SINK, Mockito.never()).onStateChange(Mockito.any(Long.class), Mockito.any(Double.class));
 
-    SINK.onSourceStateChange(SOURCE_RATE, 9001d);
+    SINK.onStateChange(SOURCE_RATE, 9001d);
     SINK.consume(SAMPLES);
 
-    Mockito.verify(NEXT_SINK, Mockito.times(1)).onSourceStateChange(Mockito.any(), Mockito.any());
+    Mockito.verify(NEXT_SINK, Mockito.times(1)).onStateChange(Mockito.any(Long.class), Mockito.any(Double.class));
 
     final int SAMPLES_TO_FEED    = 16;
     final int DECIMATION         = (int) (SOURCE_RATE / CHANNEL_RATE);

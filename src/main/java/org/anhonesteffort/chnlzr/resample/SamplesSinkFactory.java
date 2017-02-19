@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,25 +15,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.anhonesteffort.chnlzr;
+package org.anhonesteffort.chnlzr.resample;
 
+import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
-import org.anhonesteffort.chnlzr.output.RfNetworkSink;
-import org.anhonesteffort.chnlzr.resample.ResamplingSink;
-import org.anhonesteffort.chnlzr.resample.RfResamplingSink;
+import org.anhonesteffort.chnlzr.output.NetworkSampleSink;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.ChannelRequest;
 
-public class ResamplingNetworkSinkFactory {
+public class SamplesSinkFactory {
 
   private final int samplesPerMessage;
 
-  public ResamplingNetworkSinkFactory(ChnlzrServerConfig config) {
+  public SamplesSinkFactory(ChnlzrServerConfig config) {
     this.samplesPerMessage = config.samplesPerMessage();
   }
 
-  public ResamplingSink create(WriteQueuingContext context, ChannelRequest.Reader request) {
-    return new RfResamplingSink(request, new RfNetworkSink(context, samplesPerMessage));
+  public SamplesSink create(WriteQueuingContext context, ChannelRequest.Reader request) {
+    return new ResamplingSamplesSink(request, new NetworkSampleSink(context, samplesPerMessage));
   }
 
 }

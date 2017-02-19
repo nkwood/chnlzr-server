@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,16 +17,16 @@
 
 package org.anhonesteffort.chnlzr.input;
 
-import org.anhonesteffort.chnlzr.resample.ResamplingSink;
-import org.anhonesteffort.dsp.ChannelSpec;
-import org.anhonesteffort.dsp.sample.SamplesSourceException;
-import org.anhonesteffort.dsp.sample.TunableSamplesSource;
+import org.anhonesteffort.chnlzr.resample.SamplesSink;
+import org.anhonesteffort.dsp.sample.SdrSamplesSource;
+import org.anhonesteffort.dsp.util.ChannelSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.Error;
 
@@ -34,13 +34,15 @@ public class SamplesSourceController {
 
   private static final Logger log = LoggerFactory.getLogger(SamplesSourceController.class);
 
-  private final Queue<ResamplingSink> sinks   = new ConcurrentLinkedQueue<>();
-  private final Object                txnLock = new Object();
-  private final TunableSamplesSource  source;
-  private final Integer               maxSinks;
-  private final Double                dcOffsetHz;
+  private final Object txnLock = new Object();
+  private final AtomicReference<ChannelSpec> tunedChannel = new AtomicReference<>();
+  private final Queue<SamplesSink> sinks = new ConcurrentLinkedQueue<>();
 
-  public SamplesSourceController(TunableSamplesSource source, Integer maxSinks, Double dcOffsetHz) {
+  private final SdrSamplesSource source;
+  private final int maxSinks;
+  private final double dcOffsetHz;
+
+  public SamplesSourceController(SdrSamplesSource source, int maxSinks, double dcOffsetHz) {
     this.source     = source;
     this.maxSinks   = maxSinks;
     this.dcOffsetHz = dcOffsetHz;
@@ -49,37 +51,37 @@ public class SamplesSourceController {
   private Optional<Double> getMinChannelFrequency() {
     if (sinks.isEmpty()) {
       return Optional.empty();
+    } else {
+      return Optional.of(sinks.stream()
+          .mapToDouble(sink -> sink.getSpec().getMinFreq())
+          .min()
+          .getAsDouble());
     }
-
-    return Optional.of(sinks.stream()
-                            .mapToDouble(sink -> sink.getChannelSpec().getMinFreq())
-                            .min()
-                            .getAsDouble());
   }
 
   private Optional<Double> getMaxChannelFrequency() {
     if (sinks.isEmpty()) {
       return Optional.empty();
+    } else {
+      return Optional.of(sinks.stream()
+          .mapToDouble(sink -> sink.getSpec().getMaxFreq())
+          .max()
+          .getAsDouble());
     }
-
-    return Optional.of(sinks.stream()
-                            .mapToDouble(sink -> sink.getChannelSpec().getMaxFreq())
-                            .max()
-                            .getAsDouble());
   }
 
   private Optional<Long> getMaxChannelSampleRate() {
     if (sinks.isEmpty()) {
       return Optional.empty();
+    } else {
+      return Optional.of(sinks.stream()
+          .mapToLong(sink -> sink.getSpec().getSampleRate())
+          .max()
+          .getAsLong());
     }
-
-    return Optional.of(sinks.stream()
-                            .mapToLong(sink -> sink.getChannelSpec().getSampleRate())
-                            .max()
-                            .getAsLong());
   }
 
-  private ChannelSpec getIdealChannelSpec(ChannelSpec newChannel) {
+  private ChannelSpec fitAllChannels(ChannelSpec newChannel) {
     double minRequiredFreq   = Math.min(getMinChannelFrequency().get(), newChannel.getMinFreq());
     double maxRequiredFreq   = Math.max(getMaxChannelFrequency().get(), newChannel.getMaxFreq());
     double requiredBandwidth = maxRequiredFreq - minRequiredFreq;
@@ -90,7 +92,7 @@ public class SamplesSourceController {
     return ChannelSpec.fromMinMax(minRequiredFreq, maxRequiredFreq, requiredSampleRate);
   }
 
-  private ChannelSpec accommodateDcOffset(ChannelSpec spec) {
+  private ChannelSpec fitDcOffset(ChannelSpec spec) {
     double      offsetCenterFreq = spec.getCenterFrequency() + dcOffsetHz;
     double      offsetBandwidth  = spec.getBandwidth() + (Math.abs(dcOffsetHz) * 2d);
     ChannelSpec offsetSpec       = new ChannelSpec(offsetCenterFreq, offsetBandwidth, spec.getSampleRate());
@@ -106,63 +108,57 @@ public class SamplesSourceController {
 
   private boolean isTunable(ChannelSpec spec) {
     if (sinks.isEmpty()) {
-      return source.isTunable(accommodateDcOffset(spec));
+      return source.getCapabilities().contains(fitDcOffset(spec));
     } else {
-      return source.isTunable(getIdealChannelSpec(spec));
+      return source.getCapabilities().contains(fitAllChannels(spec));
     }
   }
 
-  private void handleTuneToFitNewChannel(ChannelSpec newChannel) throws SamplesSourceException {
+  private ChannelSpec tryTune(ChannelSpec newChannel) {
     if (sinks.isEmpty()) {
-      source.tune(accommodateDcOffset(newChannel));
+      return source.tryTune(fitDcOffset(newChannel));
     } else {
-      source.tune(getIdealChannelSpec(newChannel));
+      return source.tryTune(fitAllChannels(newChannel));
     }
   }
 
   public ChannelSpec getCapabilities() {
-    return ChannelSpec.fromMinMax(source.getMinTunableFreq(),
-                                  source.getMaxTunableFreq(),
-                                  source.getMaxSampleRate());
+    return source.getCapabilities();
   }
 
-  public int configureSourceForSink(ResamplingSink sink) {
+  public int configureSourceForSink(SamplesSink sink) {
     synchronized (txnLock) {
 
       if (sinks.size() >= maxSinks) {
         return Error.ERROR_PROCESSING_UNAVAILABLE;
-      }
-
-      ChannelSpec requestedChannel = sink.getChannelSpec();
-      ChannelSpec tunedChannel     = source.getTunedChannel();
-
-      if (!source.isTunable(accommodateDcOffset(requestedChannel))) {
-        return Error.ERROR_INCAPABLE;
-      }
-
-      if (!sinks.isEmpty() && tunedChannel.containsChannel(requestedChannel)) {
-        source.addSink(sink);
-        sinks.add(sink);
-        return 0x00;
-      } else if (isTunable(requestedChannel)) {
-        try {
-
-          handleTuneToFitNewChannel(requestedChannel);
-          source.addSink(sink);
-          sinks.add(sink);
-          return 0x00;
-
-        } catch (SamplesSourceException e) {
-          log.error("failed to configure source for consumer channel " + requestedChannel, e);
-          return Error.ERROR_UNKNOWN;
+      } else if (!isTunable(sink.getSpec())) {
+        return Error.ERROR_BANDWIDTH_UNAVAILABLE;
+      } else {
+        ChannelSpec tuned = tunedChannel.get();
+        if (tuned != null && tuned.contains(sink.getSpec())) {
+          if (source.addSink(sink)) {
+            sinks.add(sink);
+            return 0x00;
+          } else {
+            log.error("Source.addSink() returned false");
+            return Error.ERROR_UNKNOWN;
+          }
+        } else {
+          tunedChannel.set(tryTune(sink.getSpec()));
+          if (tunedChannel.get().contains(sink.getSpec()) && source.addSink(sink)) {
+            sinks.add(sink);
+            return 0x00;
+          } else {
+            log.error("failed to configure source for consumer channel " + sink.getSpec().toString());
+            return Error.ERROR_UNKNOWN;
+          }
         }
       }
-    }
 
-    return Error.ERROR_BANDWIDTH_UNAVAILABLE;
+    }
   }
 
-  public void releaseSink(ResamplingSink sink) {
+  public void releaseSink(SamplesSink sink) {
     synchronized (txnLock) {
       source.removeSink(sink);
       sinks.remove(sink);

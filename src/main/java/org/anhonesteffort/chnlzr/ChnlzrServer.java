@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -36,9 +35,8 @@ import org.anhonesteffort.chnlzr.capnp.BaseMessageEncoder;
 import org.anhonesteffort.chnlzr.input.InputFactory;
 import org.anhonesteffort.chnlzr.input.SamplesSourceController;
 import org.anhonesteffort.chnlzr.netty.IdleStateHeartbeatWriter;
-import org.anhonesteffort.dsp.sample.Samples;
-import org.anhonesteffort.dsp.sample.SamplesSourceException;
-import org.anhonesteffort.dsp.sample.TunableSamplesSource;
+import org.anhonesteffort.chnlzr.resample.SamplesSinkFactory;
+import org.anhonesteffort.dsp.sample.SdrSamplesSource;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -48,31 +46,26 @@ public class ChnlzrServer {
   private final CriticalCallback criticalCallback = new CriticalCallback();
   private final ListeningExecutorService sourcePool = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
 
-  private final ChnlzrServerConfig           config;
-  private final TunableSamplesSource         source;
-  private final SamplesSourceController      sourceController;
-  private final Disruptor<Samples>           disruptor;
-  private final ResamplingNetworkSinkFactory resampling;
+  private final ChnlzrServerConfig      config;
+  private final SdrSamplesSource        source;
+  private final SamplesSourceController sourceController;
+  private final SamplesSinkFactory      resampling;
 
-  public ChnlzrServer(ChnlzrServerConfig config) throws SamplesSourceException {
+  public ChnlzrServer(ChnlzrServerConfig config) throws IllegalStateException {
     this.config = config;
-    InputFactory inputFactory = new InputFactory(config);
+    InputFactory inputFactory = new InputFactory(config, criticalCallback);
 
     if (inputFactory.getSource().isPresent()) {
       source           = inputFactory.getSource().get();
-      disruptor        = inputFactory.getDisruptor().get();
       sourceController = inputFactory.getSourceController().get();
-      resampling       = new ResamplingNetworkSinkFactory(config);
+      resampling       = new SamplesSinkFactory(config);
     } else {
-      throw new SamplesSourceException("no samples sources available");
+      throw new IllegalStateException("no samples sources available");
     }
   }
 
   @SuppressWarnings("unchecked")
   private void run() throws InterruptedException {
-    disruptor.setDefaultExceptionHandler(criticalCallback);
-    disruptor.start();
-
     ListenableFuture sourceFuture = sourcePool.submit(source);
     Futures.addCallback(sourceFuture, criticalCallback);
 
@@ -108,7 +101,6 @@ public class ChnlzrServer {
       bossGroup.shutdownGracefully();
       sourceFuture.cancel(true);
       sourcePool.shutdownNow();
-      disruptor.shutdown();
     }
 
     System.exit(1);

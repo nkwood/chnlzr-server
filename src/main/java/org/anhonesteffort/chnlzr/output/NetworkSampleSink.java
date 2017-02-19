@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,14 +19,14 @@ package org.anhonesteffort.chnlzr.output;
 
 import org.anhonesteffort.chnlzr.capnp.ProtoFactory;
 import org.anhonesteffort.chnlzr.netty.WriteQueuingContext;
-import org.anhonesteffort.dsp.ComplexNumber;
+import org.anhonesteffort.dsp.util.ComplexNumber;
 import org.capnproto.MessageBuilder;
 
 import java.nio.ByteBuffer;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.BaseMessage;
 
-public class RfNetworkSink implements NetworkSink {
+public class NetworkSampleSink implements SampleSink {
 
   private final ProtoFactory        proto = new ProtoFactory();
   private final WriteQueuingContext context;
@@ -35,11 +35,9 @@ public class RfNetworkSink implements NetworkSink {
   private MessageBuilder nextMessage;
   private ByteBuffer     nextSamples;
 
-  public RfNetworkSink(WriteQueuingContext context, int samplesPerMessage) {
+  public NetworkSampleSink(WriteQueuingContext context, int samplesPerMessage) {
     this.context           = context;
     this.samplesPerMessage = samplesPerMessage;
-
-    initNextMessage();
   }
 
   private void initNextMessage() {
@@ -48,7 +46,8 @@ public class RfNetworkSink implements NetworkSink {
   }
 
   @Override
-  public void onSourceStateChange(Long sampleRate, Double frequency) {
+  public void onStateChange(long sampleRate, double frequency) {
+    if (nextMessage == null) { initNextMessage(); }
     context.writeOrQueue(proto.state(sampleRate, 0d));
   }
 

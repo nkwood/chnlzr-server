@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,67 +18,77 @@
 package org.anhonesteffort.chnlzr.input;
 
 import com.lmax.disruptor.SleepingWaitStrategy;
-import com.lmax.disruptor.dsl.Disruptor;
-import org.anhonesteffort.chnlzr.resample.ResamplingSink;
-import org.anhonesteffort.dsp.ChannelSpec;
-import org.anhonesteffort.dsp.ComplexNumber;
+import org.anhonesteffort.chnlzr.CriticalCallback;
+import org.anhonesteffort.chnlzr.resample.SamplesSink;
 import org.anhonesteffort.dsp.sample.Samples;
-import org.anhonesteffort.dsp.sample.SamplesSourceException;
-import org.anhonesteffort.dsp.sample.TunableSamplesSource;
-import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
-import org.anhonesteffort.dsp.sample.TunableSamplesSourceProvider;
+import org.anhonesteffort.dsp.sample.SamplesEvent;
+import org.anhonesteffort.dsp.sample.SdrDriver;
+import org.anhonesteffort.dsp.sample.SdrDriverProvider;
+import org.anhonesteffort.dsp.sample.SdrSamplesSource;
+import org.anhonesteffort.dsp.sample.SdrSamplesSourceProvider;
+import org.anhonesteffort.dsp.util.ChannelSpec;
+import org.anhonesteffort.dsp.util.ComplexNumber;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.anhonesteffort.chnlzr.capnp.Proto.Error;
 
 public class SamplesSourceControllerTest {
 
-  public static class DumbTunableSamplesSourceProvider implements TunableSamplesSourceProvider {
+  public static class DumbSdrDriverProvider implements SdrDriverProvider {
     @Override
-    public Optional<TunableSamplesSource> get(Disruptor<Samples> disruptor, int affinity, int concurrency) {
-      return Optional.of(new DumbTunableSamplesSource(disruptor, affinity, concurrency));
+    public Optional<SdrDriver> getDriver() {
+      return Optional.of(new DumbSdrDriver());
     }
 
     @Override
-    public Samples newInstance() {
-      return new Samples(new ComplexNumber[50]);
+    public SamplesEvent newInstance() {
+      return new SamplesEvent(-1l, -1d, new Samples(new ComplexNumber[50]));
     }
   }
 
-  public static class DumbTunableSamplesSource extends TunableSamplesSource {
-    public static final Long   MAX_SAMPLE_RATE =   400_000l;
-    public static final Double MIN_FREQ        =   100_000d;
-    public static final Double MAX_FREQ        = 1_000_000d;
+  public static class DumbSdrDriver extends SdrDriver {
+    public static final long   MAX_SAMPLE_RATE =   400_000l;
+    public static final double MIN_FREQ        =   100_000d;
+    public static final double MAX_FREQ        = 1_000_000d;
 
-    public DumbTunableSamplesSource(Disruptor<Samples> disruptor, int affinity, int concurrency) {
-      super(MAX_SAMPLE_RATE, MIN_FREQ, MAX_FREQ, disruptor, affinity, concurrency);
+    public DumbSdrDriver() {
+      super(MAX_SAMPLE_RATE, MIN_FREQ, MAX_FREQ);
     }
 
     @Override
-    protected Long setSampleRate(Long targetRate) throws SamplesSourceException {
-      if (targetRate > MAX_SAMPLE_RATE)
-        throw new SamplesSourceException("don't");
-
-      this.sampleRate = targetRate;
-      return targetRate;
+    protected ChannelSpec onStart() {
+      return new ChannelSpec(MIN_FREQ, MAX_SAMPLE_RATE, MAX_SAMPLE_RATE);
     }
 
     @Override
-    protected Double setFrequency(Double targetFreq) throws SamplesSourceException {
-      if (targetFreq < MIN_FREQ || targetFreq > MAX_FREQ)
-        throw new SamplesSourceException("don't");
-
-      this.frequency = targetFreq;
-      return targetFreq;
+    protected long setSampleRate(long targetRate) {
+      if (targetRate > MAX_SAMPLE_RATE) {
+        throw new IllegalArgumentException("don't");
+      } else {
+        return targetRate;
+      }
     }
 
     @Override
-    protected void fillBuffer(Samples samples) throws SamplesSourceException { }
+    protected double setFrequency(double targetFreq) {
+      if (targetFreq < MIN_FREQ || targetFreq > MAX_FREQ) {
+        throw new IllegalArgumentException("don't");
+      } else {
+        return targetFreq;
+      }
+    }
+
+    @Override
+    protected void fillBuffer(Samples samples) { }
   }
 
-  private static class DumbChannelSink implements ResamplingSink {
+  private static class DumbChannelSink implements SamplesSink {
     private final ChannelSpec spec;
 
     public DumbChannelSink(ChannelSpec spec) {
@@ -86,65 +96,87 @@ public class SamplesSourceControllerTest {
     }
 
     @Override
-    public ChannelSpec getChannelSpec() {
-      return spec;
-    }
+    public ChannelSpec getSpec() { return spec; }
 
     @Override
-    public void onSourceStateChange(Long sampleRate, Double frequency) { }
+    public void onStateChange(long sampleRate, double frequency) { }
 
     @Override
     public void consume(Samples samples) { }
   }
 
-  private static ResamplingSink sinkFor(Double minFreq, Double maxFreq) {
+  private static SdrSamplesSource sourceFor(int concurrency) {
+    return new SdrSamplesSourceProvider(
+        new SleepingWaitStrategy(),
+        128, concurrency,0,
+        new CriticalCallback()
+    ).getSource().get();
+  }
+
+  private static SamplesSink sinkFor(Double minFreq, Double maxFreq) {
     return new DumbChannelSink(ChannelSpec.fromMinMax(minFreq, maxFreq));
+  }
+
+  private ExecutorService POOL;
+
+  @Before
+  public void setup() {
+    POOL = Executors.newFixedThreadPool(1);
+  }
+
+  @After
+  public void tearDown() {
+    POOL.shutdownNow();
   }
 
   @Test
   public void testWithSingleSink() throws Exception {
-    final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 1, DC_OFFSET);
+    final SdrSamplesSource        SOURCE     = sourceFor(1);
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 1, 0d);
 
-    final ResamplingSink SINK0 = sinkFor(500_000d, 600_000d);
+    POOL.submit(SOURCE);
+    Thread.sleep(500l);
+
+    final SamplesSink SINK0 = sinkFor(500_000d, 600_000d);
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
     CONTROLLER.releaseSink(SINK0);
 
-    final ResamplingSink SINK1 = sinkFor(100_000d, 200_000d);
+    final SamplesSink SINK1 = sinkFor(100_000d, 200_000d);
     assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;
     CONTROLLER.releaseSink(SINK1);
 
-    final ResamplingSink SINK2 = sinkFor(900_000d, 1_000_000d);
+    final SamplesSink SINK2 = sinkFor(900_000d, 1_000_000d);
     assert CONTROLLER.configureSourceForSink(SINK2) == 0x00;
     CONTROLLER.releaseSink(SINK2);
 
-    final ResamplingSink SINK3 = sinkFor(100_000d, 300_000d);
+    final SamplesSink SINK3 = sinkFor(100_000d, 300_000d);
     assert CONTROLLER.configureSourceForSink(SINK3) == 0x00;
     CONTROLLER.releaseSink(SINK3);
 
-    final ResamplingSink SINK4 = sinkFor(99_999d,  199_999d);
-    assert CONTROLLER.configureSourceForSink(SINK4) == Error.ERROR_INCAPABLE;
+    final SamplesSink SINK4 = sinkFor(99_999d,  199_999d);
+    assert CONTROLLER.configureSourceForSink(SINK4) == Error.ERROR_BANDWIDTH_UNAVAILABLE;
     CONTROLLER.releaseSink(SINK4);
 
-    final ResamplingSink SINK5 = sinkFor(900_001d, 1_000_001d);
-    assert CONTROLLER.configureSourceForSink(SINK5) == Error.ERROR_INCAPABLE;
+    final SamplesSink SINK5 = sinkFor(900_001d, 1_000_001d);
+    assert CONTROLLER.configureSourceForSink(SINK5) == Error.ERROR_BANDWIDTH_UNAVAILABLE;
     CONTROLLER.releaseSink(SINK5);
 
-    final ResamplingSink SINK6 = sinkFor(100_000d, 300_001d);
-    assert CONTROLLER.configureSourceForSink(SINK6) == Error.ERROR_INCAPABLE;
+    final SamplesSink SINK6 = sinkFor(100_000d, 300_001d);
+    assert CONTROLLER.configureSourceForSink(SINK6) == Error.ERROR_BANDWIDTH_UNAVAILABLE;
     CONTROLLER.releaseSink(SINK6);
   }
 
   @Test
   public void testWithMultipleSinks() throws Exception {
-    final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 5, DC_OFFSET);
-    final ResamplingSink          SINK0      = sinkFor(500_000d, 600_000d);
-    final ResamplingSink          SINK1      = sinkFor(600_000d, 700_000d);
-    final ResamplingSink          SINK2      = sinkFor(700_000d, 800_000d);
-    final ResamplingSink          SINK3      = sinkFor(800_000d, 900_000d);
+    final SdrSamplesSource        SOURCE     = sourceFor(5);
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 5, 0d);
+    final SamplesSink             SINK0      = sinkFor(500_000d, 600_000d);
+    final SamplesSink             SINK1      = sinkFor(600_000d, 700_000d);
+    final SamplesSink             SINK2      = sinkFor(700_000d, 800_000d);
+    final SamplesSink             SINK3      = sinkFor(800_000d, 900_000d);
+
+    POOL.submit(SOURCE);
+    Thread.sleep(500l);
 
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
     assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;
@@ -161,13 +193,15 @@ public class SamplesSourceControllerTest {
 
   @Test
   public void testMaxSinks() throws Exception {
-    final Double                  DC_OFFSET  = 0d;
-    final TunableSamplesSource    SOURCE     = new TunableSamplesSourceFactory(new SleepingWaitStrategy(), 512, 0, 10).getSource().get();
-    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 3, DC_OFFSET);
-    final ResamplingSink          SINK0      = sinkFor(500_000d, 600_000d);
-    final ResamplingSink          SINK1      = sinkFor(600_000d, 700_000d);
-    final ResamplingSink          SINK2      = sinkFor(700_000d, 800_000d);
-    final ResamplingSink          SINK3      = sinkFor(800_000d, 900_000d);
+    final SdrSamplesSource        SOURCE     = sourceFor(3);
+    final SamplesSourceController CONTROLLER = new SamplesSourceController(SOURCE, 3, 0d);
+    final SamplesSink             SINK0      = sinkFor(500_000d, 600_000d);
+    final SamplesSink             SINK1      = sinkFor(600_000d, 700_000d);
+    final SamplesSink             SINK2      = sinkFor(700_000d, 800_000d);
+    final SamplesSink             SINK3      = sinkFor(800_000d, 900_000d);
+
+    POOL.submit(SOURCE);
+    Thread.sleep(500l);
 
     assert CONTROLLER.configureSourceForSink(SINK0) == 0x00;
     assert CONTROLLER.configureSourceForSink(SINK1) == 0x00;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 An Honest Effort LLC.
+ * Copyright (C) 2017 An Honest Effort LLC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,48 +18,40 @@
 package org.anhonesteffort.chnlzr.input;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.ExceptionHandler;
 import org.anhonesteffort.chnlzr.ChnlzrServerConfig;
-import org.anhonesteffort.dsp.sample.Samples;
-import org.anhonesteffort.dsp.sample.TunableSamplesSource;
-import org.anhonesteffort.dsp.sample.TunableSamplesSourceFactory;
+import org.anhonesteffort.dsp.sample.SdrSamplesSource;
+import org.anhonesteffort.dsp.sample.SdrSamplesSourceProvider;
 
 import java.util.Optional;
 
 public class InputFactory {
 
-  private final Optional<TunableSamplesSource>    source;
+  private final Optional<SdrSamplesSource> source;
   private final Optional<SamplesSourceController> sourceController;
-  private final Optional<Disruptor<Samples>>      disruptor;
 
-  public InputFactory(ChnlzrServerConfig config) {
-    TunableSamplesSourceFactory sourceFactory = new TunableSamplesSourceFactory(
+  public InputFactory(ChnlzrServerConfig config, ExceptionHandler disruptorCallback) {
+    SdrSamplesSourceProvider sourceProvider = new SdrSamplesSourceProvider(
         new BlockingWaitStrategy(), config.ringBufferSize(),
-        config.sourceCpuAffinity(), config.cicPoolSize()
+        config.cicPoolSize(), config.sourceCpuAffinity(), disruptorCallback
     );
 
-    source    = sourceFactory.getSource();
-    disruptor = Optional.ofNullable(sourceFactory.getDisruptor());
-
+    source = sourceProvider.getSource();
     if (source.isPresent()) {
       this.sourceController = Optional.of(new SamplesSourceController(
-          sourceFactory.getSource().get(), config.cicPoolSize(), config.dcOffset()
+          source.get(), config.cicPoolSize(), config.dcOffset()
       ));
     } else {
       this.sourceController = Optional.empty();
     }
   }
 
-  public Optional<TunableSamplesSource> getSource() {
+  public Optional<SdrSamplesSource> getSource() {
     return source;
   }
 
   public Optional<SamplesSourceController> getSourceController() {
     return sourceController;
-  }
-
-  public Optional<Disruptor<Samples>> getDisruptor() {
-    return disruptor;
   }
 
 }
